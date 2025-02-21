@@ -3,13 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
-import pandas as pd
-import numpy as np
-import tensorflow as tf
-from tensorflow import keras
 import os
-from dotenv import load_dotenv
-load_dotenv(".env.local")
 from serpAPIService import EventService
 
 # Suppress TensorFlow INFO and WARNING messages (only show errors)
@@ -94,46 +88,6 @@ class Event(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# Preprocessing function
-def preprocess_test_data(df):
-    # Create a copy to avoid modifying the original
-    df = df.copy()
-    
-    # Ensure all required columns exist
-    required_columns = ['timestamp', 'birthyear', 'joinedAt', 'gender', 'locale', 'location']
-    missing_columns = [col for col in required_columns if col not in df.columns]
-    if missing_columns:
-        raise ValueError(f"Missing required columns: {missing_columns}")
-
-    # Convert timestamp to datetime if it isn't already
-    if not pd.api.types.is_datetime64_any_dtype(df['timestamp']):
-        df['timestamp'] = pd.to_datetime(df['timestamp'])
-    
-    # Feature engineering
-    df['user_age'] = datetime.now().year - df['birthyear']
-    df['days_since_joined'] = (datetime.now() - pd.to_datetime(df['joinedAt'])).dt.total_seconds() / (24 * 3600)
-    df['hour_of_day'] = df['timestamp'].dt.hour
-    df['day_of_week'] = df['timestamp'].dt.dayofweek
-    
-    # Encode categorical variables
-    categorical_cols = ['gender', 'locale', 'location']
-    for col in categorical_cols:
-        if col in df.columns:
-            df[col] = le.fit_transform(df[col].astype(str))
-    
-    # Normalize numerical features
-    numerical_cols = ['birthyear', 'timezone', 'user_age', 'days_since_joined']
-    present_numerical_cols = [col for col in numerical_cols if col in df.columns]
-    if present_numerical_cols:
-        df[present_numerical_cols] = scaler.fit_transform(df[present_numerical_cols])
-    
-    return df
-
-# Feature selection function
-def select_features(df):
-    features = ['user', 'event', 'invited', 'user_age', 'days_since_joined', 'hour_of_day', 'day_of_week',
-                'gender', 'locale', 'location', 'timezone', 'event_popularity']
-    return df[features]
 
 # Routes
 @app.route('/')
@@ -313,91 +267,6 @@ def my_events():
     events = Event.query.filter_by(organizer_id=current_user.id).all()
     return render_template('my_events.html', events=events)
 
-@app.route('/recommendations')
-@login_required
-def recommendations():
-    # Get all public events
-    public_events = Event.query.filter_by(privacy='public').all()
-    
-    if not public_events:
-        flash('No public events available for recommendations.')
-        return redirect(url_for('index'))
-
-    # Prepare data for prediction
-    current_time = datetime.now()
-    test_data = []
-    
-    for event in public_events:
-        test_data.append({
-            'user': current_user.id,
-            'event': event.id,
-            'invited': 0,  # Assume not invited for simplicity
-            'timestamp': current_time,
-            'birthyear': current_user.birthyear,
-            'gender': current_user.gender,
-            'locale': current_user.locale,
-            'location': current_user.location,
-            'timezone': current_user.timezone,
-            'joinedAt': current_user.joinedAt,
-            'event_popularity': event.event_popularity
-        })
-
-    # Convert to DataFrame
-    test_data = pd.DataFrame(test_data)
-
-    try:
-        # Validate required columns exist
-        required_columns = ['timestamp', 'birthyear', 'joinedAt', 'gender', 'locale', 'location']
-        missing_columns = [col for col in required_columns if col not in test_data.columns]
-        
-        if missing_columns:
-            app.logger.error(f"Missing columns in test_data: {missing_columns}")
-            # Check if any user data is missing
-            if not current_user.birthyear or not current_user.gender or \
-               not current_user.locale or not current_user.location:
-                flash('Please complete your profile to get personalized recommendations.', 'warning')
-                return redirect(url_for('index'))
-            raise ValueError(f"Missing required columns: {missing_columns}")
-
-        # Handle null values before preprocessing
-        test_data['birthyear'] = test_data['birthyear'].fillna(1990)  # Use a reasonable default
-        test_data['gender'] = test_data['gender'].fillna('unknown')
-        test_data['locale'] = test_data['locale'].fillna('unknown')
-        test_data['location'] = test_data['location'].fillna('unknown')
-        test_data['timezone'] = test_data['timezone'].fillna(0)
-        
-        # Preprocess the test data
-        test_data_processed = preprocess_test_data(test_data)
-
-        # Select features
-        X_test = select_features(test_data_processed)
-
-        # Make predictions
-        predictions = model.predict([
-            X_test['user'], 
-            X_test['event'], 
-            X_test.drop(['user', 'event'], axis=1)
-        ])
-        
-        # Add predictions to the results
-        event_predictions = list(zip(public_events, predictions.flatten()))
-        
-        # Sort events by predicted interest and get top 10
-        recommended_events = sorted(
-            event_predictions, 
-            key=lambda x: x[1], 
-            reverse=True
-        )[:10]
-
-        return render_template(
-            'recommendations.html', 
-            recommended_events=recommended_events
-        )
-        
-    except Exception as e:
-        app.logger.error(f"Error in recommendations: {str(e)}")
-        flash('Error generating recommendations. Please try again later.', 'error')
-        return redirect(url_for('index'))
 
 if __name__ == '__main__':
     init_db()
