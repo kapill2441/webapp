@@ -258,4 +258,4 @@ def my_events():
 
 if __name__ == '__main__':
     init_db()
-    app.run(port="0.0.0.0",debug=True, use_reloader=False)
+    app.run(host='0.0.0.0',debug=True, use_reloader=False)
