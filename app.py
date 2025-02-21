@@ -17,6 +17,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 app = Flask(__name__)
+
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///smart_event_organizer.db'
 db = SQLAlchemy(app)
