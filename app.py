@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+import requests
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import os
@@ -255,6 +256,93 @@ def my_events():
     events = Event.query.filter_by(organizer_id=current_user.id).all()
     return render_template('my_events.html', events=events)
 
+
+class RecommendationService:
+    def __init__(self, api_url):
+        self.api_url = api_url
+
+    def get_recommendations(self, user, events):
+        try:
+            # Prepare user data
+            user_data = {
+                'birthyear': user.birthyear,
+                'gender': user.gender,
+                'locale': user.locale,
+                'location': user.location,
+                'timezone': user.timezone,
+                'joinedAt': user.joinedAt.isoformat()
+            }
+
+            # Prepare request data
+            request_data = {
+                'user': {'id': user.id},
+                'events': [
+                    {
+                        'id': event.id,
+                        'title': event.title,
+                        'description': event.description,
+                        'date': event.date.isoformat(),
+                        'privacy': event.privacy,
+                        'event_popularity': event.event_popularity
+                    }
+                    for event in events
+                ],
+                'user_data': user_data
+            }
+
+            # Make API request
+            response = requests.post(
+                f"{self.api_url}/api/recommendations",
+                json=request_data
+            )
+            
+            if response.status_code == 200:
+                return response.json()['recommendations']
+            else:
+                raise Exception(f"API request failed: {response.text}")
+
+        except Exception as e:
+            print(f"Error getting recommendations: {e}")
+            return []
+
+# Initialize recommendation service
+recommendation_service = RecommendationService('http://localhost:5001')
+
+@app.route('/recommendations')
+@login_required
+def recommendations():
+    try:
+        # Get all public events
+        public_events = Event.query.filter_by(privacy='public').all()
+        
+        if not public_events:
+            flash('No public events available for recommendations.')
+            return redirect(url_for('index'))
+
+        # Get recommendations from API
+        recommendations = recommendation_service.get_recommendations(
+            current_user,
+            public_events
+        )
+
+        # Process recommendations for template
+        recommended_events = [
+            (
+                Event.query.get(rec['event']['id']),
+                rec['score']
+            )
+            for rec in recommendations
+        ]
+
+        return render_template(
+            'recommendations.html',
+            recommended_events=recommended_events
+        )
+
+    except Exception as e:
+        app.logger.error(f"Error in recommendations: {str(e)}")
+        flash('Error generating recommendations. Please try again later.', 'error')
+        return redirect(url_for('index'))
 
 if __name__ == '__main__':
     init_db()
