@@ -6,10 +6,6 @@ from datetime import datetime
 import os
 from serpAPIService import EventService
 
-# Suppress TensorFlow INFO and WARNING messages (only show errors)
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-
 app = Flask(__name__)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
@@ -18,12 +14,6 @@ db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-# Load the trained model
-model = keras.models.load_model('event_recommendation_model.keras')
-
-# Initialize StandardScaler and LabelEncoder
-scaler = StandardScaler()
-le = LabelEncoder()
 
 # Models
 
