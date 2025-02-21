@@ -260,4 +260,4 @@ def my_events():
 
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True, use_reloader=False)
+    app.run(port="0.0.0.0",debug=True, use_reloader=False)
