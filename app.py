@@ -6,9 +6,13 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import os
 from serpAPIService import EventService
+import logging
+from flask import current_app
+from dotenv import load_dotenv
+load_dotenv(".env.local")
 
 app = Flask(__name__)
-
+app.logger.setLevel(logging.DEBUG)
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///smart_event_organizer.db'
 db = SQLAlchemy(app)
@@ -108,11 +112,15 @@ def index():
 
 @app.route('/api/events')
 def api_events():
+    app.logger.debug("Received request for events API")
     event_service = EventService(os.getenv('SERPAPI_KEY'))
     
     # Get location parameters
     lat = request.args.get('lat', type=float)
     lng = request.args.get('lng', type=float)
+    
+    # Debug log the coordinates
+    app.logger.debug(f"Received coordinates: lat={lat}, lng={lng}")
     
     # Get other filter parameters
     query = request.args.get('q')
@@ -123,7 +131,7 @@ def api_events():
     location = None
     if lat and lng:
         try:
-            import requests
+            app.logger.debug(f"Attempting reverse geocoding for coordinates: {lat}, {lng}")
             response = requests.get(
                 f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lng}&format=json",
                 headers={'User-Agent': 'EventFlowAI/1.0'}
@@ -133,26 +141,33 @@ def api_events():
                 address = data.get('address', {})
                 # Try to get city, state, or country
                 location = address.get('city') or address.get('state') or address.get('country')
+                app.logger.debug(f"Reverse geocoded location: {location}")
         except Exception as e:
             app.logger.error(f"Error in reverse geocoding: {e}")
     
     # If location lookup failed, use a default radius around coordinates
     if not location and lat and lng:
         location = f"{lat},{lng}"
+        app.logger.debug(f"Using coordinate-based location: {location}")
+
+    # Search for events using the EventService
+    events = event_service.search_events(
+        query=query,
+        location=location,
+        date=date,
+        page=page
+    )
     
-    try:
-        events = event_service.search_events(
-            query=query,
-            location=location,
-            date=date,
-            page=page
-        )
-        return jsonify(events)
-    except Exception as e:
-        app.logger.error(f"Error fetching events: {e}")
-        return jsonify([])
-
-
+    # Return JSON response
+    return jsonify({
+        'events': events,
+        'meta': {
+            'location': location,
+            'query': query,
+            'date': date,
+            'page': page
+        }
+    })
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -345,5 +360,7 @@ def recommendations():
         return redirect(url_for('index'))
 
 if __name__ == '__main__':
+    if not os.getenv('SERPAPI_KEY'):
+        print("WARNING: SERPAPI_KEY environment variable not set!")
     init_db()
-    app.run(host='0.0.0.0',debug=True, use_reloader=False)
+    app.run(host='0.0.0.0', debug=True, use_reloader=False)
