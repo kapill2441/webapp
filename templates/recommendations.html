@@ -1,18 +1,22 @@
 {% extends "base.html" %}
+
 {% block content %}
 <div class="container mx-auto px-4 py-12 bg-gray-50">
     <h2 class="text-3xl font-bold mb-8 text-center text-gray-800">
         Discover Events Just for You
     </h2>
     
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+    <!-- Loading State -->
+    <div id="loading-state" class="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        <p class="text-gray-600 text-lg">Finding the perfect events for you...</p>
+    </div>
+
+    <!-- Content State -->
+    <div id="content-state" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 hidden">
         {% for event, score in recommended_events %}
         <div class="bg-white rounded-xl shadow-lg overflow-hidden transform hover:scale-105 transition-transform duration-300">
-            <!-- {% if event.image_url %}
-            <img src="{{ event.image_url }}" alt="{{ event.title }}" class="w-full h-48 object-cover">
-            {% else %} -->
             <div class="w-full h-48 bg-gradient-to-r from-blue-500 to-purple-500"></div>
-            {% endif %}
             
             <div class="p-6">
                 <h5 class="text-xl font-bold mb-3 text-gray-900">{{ event.title }}</h5>
@@ -38,4 +42,17 @@
         {% endfor %}
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const loadingState = document.getElementById('loading-state');
+    const contentState = document.getElementById('content-state');
+    
+    // Show content after a short delay
+    setTimeout(() => {
+        loadingState.classList.add('hidden');
+        contentState.classList.remove('hidden');
+    }, 1000);
+});
+</script>
 {% endblock %}

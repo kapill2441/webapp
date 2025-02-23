@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Hero Section -->
+    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-8 text-white">
+        <div class="max-w-3xl mx-auto text-center space-y-4">
+            <h1 class="text-4xl font-bold">Discover Amazing Events</h1>
+            <p class="text-xl opacity-90">Find the perfect events happening around you</p>
+        </div>
+    </div>
+
+    <!-- Events Grid -->
+    <div id="events-container" class="space-y-6">
+        <div class="flex justify-between items-center">
+            <h2 class="text-2xl font-bold text-gray-900">Upcoming Events</h2>
+            <div class="text-sm text-gray-500" id="events-count"></div>
+        </div>
+        
+        <!-- Loading State -->
+        <div id="loading-state" class="hidden">
+            <div class="flex justify-center items-center py-12">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+            </div>
+        </div>
+
+        <!-- Events Grid -->
+        <div id="events-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Events will be inserted here -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="hidden">
+            <div class="text-center py-12">
+                <div class="text-gray-400 text-6xl mb-4">🔍</div>
+                <h3 class="text-lg font-medium text-gray-900">No events found</h3>
+                <p class="text-gray-500 mt-2">Try adjusting your filters</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+window.addEventListener('load', function() {
+    const filterButtons = document.querySelectorAll('.filter-btn');
+    let currentFilter = 'all';
+
+    // Show loading state
+    function showLoading() {
+        document.getElementById('loading-state').classList.remove('hidden');
+        document.getElementById('events-grid').classList.add('hidden');
+        document.getElementById('empty-state').classList.add('hidden');
+    }
+
+    // Update events display
+    async function fetchEvents() {
+        showLoading();
+
+        try {
+            // Get user's location if available
+            let params = new URLSearchParams({
+                category: currentFilter
+            });
+
+            if (navigator.geolocation) {
+                try {
+                    const position = await new Promise((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(resolve, reject);
+                    });
+                    params.append('lat', position.coords.latitude);
+                    params.append('lng', position.coords.longitude);
+                } catch (err) {
+                    console.log('Location access denied or error:', err);
+                }
+            }
+
+            // Fetch events
+            const response = await fetch(`/api/events?${params}`);
+            if (!response.ok) throw new Error('Network response was not ok');
+            
+            const data = await response.json();
+            
+            // Update UI
+            document.getElementById('loading-state').classList.add('hidden');
+            const eventsGrid = document.getElementById('events-grid');
+            
+            if (data.events && data.events.length > 0) {
+                eventsGrid.classList.remove('hidden');
+                document.getElementById('empty-state').classList.add('hidden');
+                eventsGrid.innerHTML = data.events.map(event => createEventCard(event)).join('');
+                document.getElementById('events-count').textContent = `${data.events.length} events found`;
+            } else {
+                eventsGrid.classList.add('hidden');
+                document.getElementById('empty-state').classList.remove('hidden');
+                document.getElementById('events-count').textContent = '0 events found';
+            }
+        } catch (error) {
+            console.error('Error fetching events:', error);
+            document.getElementById('loading-state').classList.add('hidden');
+            document.getElementById('events-grid').innerHTML = `
+                <div class="col-span-full text-center py-12">
+                    <p class="text-red-600">Failed to load events. Please try again.</p>
+                </div>
+            `;
+        }
+    }
+
+    // Create event card HTML
+    function createEventCard(event) {
+        const dateText = event.date?.when || event.date?.start_date || 'Date TBA';
+        const venue = event.venue || '';
+        const tickets = event.tickets || {};
+
+        return `
+            <div class="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-300">
+                <div class="h-48 bg-gray-100 relative">
+                    ${event.thumbnail ? 
+                        `<img src="${escapeHtml(event.thumbnail)}" 
+                            alt="${escapeHtml(event.title)}" 
+                            class="w-full h-full object-cover object-center">` :
+                        `<div class="flex items-center justify-center h-full">
+                            <span class="text-4xl">📸</span>
+                        </div>`
+                    }
+                </div>
+                <div class="p-6">
+                    <h3 class="font-semibold text-lg text-gray-900 mb-2">${escapeHtml(event.title)}</h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center text-gray-600">
+                            <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span class="text-sm">${escapeHtml(dateText)}</span>
+                        </div>
+                        ${venue ? `
+                            <div class="flex items-center text-gray-600">
+                                <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                          d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                </svg>
+                                <span class="text-sm">${escapeHtml(venue)}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+                ${tickets.price || tickets.link ? `
+                    <div class="px-6 py-4 bg-gray-50 border-t border-gray-100">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-gray-900">${escapeHtml(tickets.price || 'Tickets available')}</span>
+                            ${tickets.link ? `
+                                <a href="${escapeHtml(tickets.link)}" 
+                                   target="_blank" 
+                                   rel="noopener noreferrer"
+                                   class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                                    Get Tickets
+                                </a>
+                            ` : ''}
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    // Escape HTML
+    function escapeHtml(unsafe) {
+        if (typeof unsafe !== 'string') return '';
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    // Add click handlers to filter buttons
+    filterButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            filterButtons.forEach(btn => btn.classList.remove('bg-indigo-50', 'border-indigo-600'));
+            button.classList.add('bg-indigo-50', 'border-indigo-600');
+            currentFilter = button.dataset.filter;
+            fetchEvents();
+        });
+    });
+
+    // Initial load of events
+    fetchEvents();
+});
+</script>
+{% endblock %}
