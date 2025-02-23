@@ -1,3 +1,4 @@
+# main webapp
 from flask import Flask, jsonify, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
@@ -79,7 +80,7 @@ class Event(db.Model):
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 
 # Routes
@@ -108,7 +109,26 @@ def index():
         page=page
     )
     
-    return render_template('index.html', events=events)
+    return render_template('lander.html', events=events)
+
+@app.route('/home')
+@login_required
+def home():
+    # Initialize the event service with your API key
+    event_service = EventService(os.getenv('SERPAPI_KEY'))
+    
+    # Get events based on user interests if available
+    user_interests = UserInterests.query.filter_by(user_id=current_user.id).all()
+    query = user_interests[0].subcategory if user_interests else None
+    
+    # Get initial events for the page
+    events = event_service.search_events(
+        query=query,
+        location=current_user.location,
+        page=1
+    )
+    
+    return render_template('home.html', events=events)
 
 @app.route('/api/events')
 def api_events():
@@ -175,7 +195,7 @@ def login():
         user = User.query.filter_by(username=request.form['username']).first()
         if user and user.check_password(request.form['password']):
             login_user(user)
-            return redirect(url_for('index'))
+            return redirect(url_for('home'))
         flash('Invalid username or password')
     return render_template('login.html')
 
@@ -278,50 +298,56 @@ class RecommendationService:
 
     def get_recommendations(self, user, events):
         try:
-            # Prepare user data
+            # Prepare user data with default values for missing fields
             user_data = {
-                'birthyear': user.birthyear,
-                'gender': user.gender,
-                'locale': user.locale,
-                'location': user.location,
-                'timezone': user.timezone,
-                'joinedAt': user.joinedAt.isoformat()
+                'birthyear': user.birthyear or 1990,
+                'gender': user.gender or 'unknown',
+                'locale': user.locale or 'unknown',
+                'location': user.location or 'unknown',
+                'timezone': user.timezone or 0,
+                'joinedAt': user.joinedAt.isoformat() if user.joinedAt else datetime.utcnow().isoformat()
             }
+
+            # Prepare event data ensuring all required fields are present
+            events_data = []
+            for event in events:
+                event_dict = {
+                    'id': event.id,
+                    'title': event.title,
+                    'description': event.description or '',
+                    'date': event.date.isoformat() if event.date else datetime.utcnow().isoformat(),
+                    'privacy': event.privacy or 'public',
+                    'event_popularity': float(event.event_popularity if event.event_popularity is not None else 0.5),
+                    'invited': 0  # Adding default value for invited field
+                }
+                events_data.append(event_dict)
 
             # Prepare request data
             request_data = {
                 'user': {'id': user.id},
-                'events': [
-                    {
-                        'id': event.id,
-                        'title': event.title,
-                        'description': event.description,
-                        'date': event.date.isoformat(),
-                        'privacy': event.privacy,
-                        'event_popularity': event.event_popularity
-                    }
-                    for event in events
-                ],
+                'events': events_data,
                 'user_data': user_data
             }
 
             # Make API request
             response = requests.post(
                 f"{self.api_url}/api/recommendations",
-                json=request_data
+                json=request_data,
+                headers={'Content-Type': 'application/json'}
             )
             
             if response.status_code == 200:
                 return response.json()['recommendations']
             else:
+                print(f"API Response: {response.text}")  # Debug print
                 raise Exception(f"API request failed: {response.text}")
 
         except Exception as e:
             print(f"Error getting recommendations: {e}")
             return []
-
 # Initialize recommendation service
-recommendation_service = RecommendationService('http://localhost:5001')
+ai_api = os.getenv("AI_API")
+recommendation_service = RecommendationService(ai_api)
 
 @app.route('/recommendations')
 @login_required
@@ -332,7 +358,7 @@ def recommendations():
         
         if not public_events:
             flash('No public events available for recommendations.')
-            return redirect(url_for('index'))
+            return redirect(url_for('home'))
 
         # Get recommendations from API
         recommendations = recommendation_service.get_recommendations(
@@ -340,10 +366,10 @@ def recommendations():
             public_events
         )
 
-        # Process recommendations for template
+        # Process recommendations for template using session.get()
         recommended_events = [
             (
-                Event.query.get(rec['event']['id']),
+                db.session.get(Event, rec['event']['id']),
                 rec['score']
             )
             for rec in recommendations
