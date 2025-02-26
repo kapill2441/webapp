@@ -1,53 +1,53 @@
 {% extends 'base.html' %}
 
-{% block title %}Create Event{% endblock %}
+{% block title %}Edit Event{% endblock %}
 
 {% block content %}
 <div class="max-w-3xl mx-auto">
-  <h1 class="text-2xl font-bold text-gray-900 mb-6">Create New Event</h1>
+  <h1 class="text-2xl font-bold text-gray-900 mb-6">Edit Event</h1>
   
   <div class="bg-white shadow rounded-lg">
-    <form method="POST" action="{{ url_for('create_event') }}" class="p-6">
+    <form method="POST" action="{{ url_for('edit_event', event_id=event.id) }}" class="p-6">
       <div class="grid grid-cols-1 gap-6">
         <div>
           <label for="title" class="block text-sm font-medium text-gray-700">Event Title</label>
           <input type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                id="title" name="title" required>
+                id="title" name="title" value="{{ event.title }}" required>
         </div>
         
         <div>
           <label for="description" class="block text-sm font-medium text-gray-700">Description</label>
           <textarea class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                    id="description" name="description" rows="4"></textarea>
+                    id="description" name="description" rows="4">{{ event.description }}</textarea>
         </div>
         
         <div>
           <label for="location" class="block text-sm font-medium text-gray-700">Location</label>
           <input type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                id="location" name="location" required>
+                id="location" name="location" value="{{ event.location }}" required>
           <p class="mt-1 text-sm text-gray-500">Enter a city or specific venue location.</p>
         </div>
         
         <div>
           <label for="date" class="block text-sm font-medium text-gray-700">Date</label>
           <input type="date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                id="date" name="date" required>
+                id="date" name="date" value="{{ event.date.strftime('%Y-%m-%d') }}" required>
         </div>
         
         <div>
           <label for="privacy" class="block text-sm font-medium text-gray-700">Privacy</label>
           <select class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
                   id="privacy" name="privacy" required>
-            <option value="public">Public</option>
-            <option value="private">Private</option>
-            <option value="invitation">Invitation Only</option>
+            <option value="public" {% if event.privacy == 'public' %}selected{% endif %}>Public</option>
+            <option value="private" {% if event.privacy == 'private' %}selected{% endif %}>Private</option>
+            <option value="invitation" {% if event.privacy == 'invitation' %}selected{% endif %}>Invitation Only</option>
           </select>
         </div>
         
         <div>
           <label for="event_popularity" class="block text-sm font-medium text-gray-700">Event Popularity (0.1 - 1.0)</label>
           <input type="number" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                id="event_popularity" name="event_popularity" min="0.1" max="1.0" step="0.1" value="0.5" required>
+                id="event_popularity" name="event_popularity" min="0.1" max="1.0" step="0.1" value="{{ event.event_popularity }}" required>
           <p class="mt-1 text-sm text-gray-500">Higher values indicate more popular events.</p>
         </div>
       </div>
@@ -57,7 +57,7 @@
           Cancel
         </a>
         <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-          Create Event
+          Update Event
         </button>
       </div>
     </form>

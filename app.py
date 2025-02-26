@@ -4,12 +4,16 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 import requests
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 from serpAPIService import EventService
 import logging
 from flask import current_app
 from dotenv import load_dotenv
+import random
+import faker
+from faker import Faker
+
 load_dotenv(".env.local")
 
 app = Flask(__name__)
@@ -35,6 +39,7 @@ class User(UserMixin, db.Model):
     timezone = db.Column(db.Integer)
     joinedAt = db.Column(db.DateTime, default=datetime.utcnow)
     interests = db.relationship('UserInterests', backref='user', lazy=True)
+    joined_events = db.relationship('EventAttendee', backref='user', lazy=True)
 
     def set_password(self, password):
         """Set the password hash for the user."""
@@ -59,6 +64,33 @@ class UserInterests(db.Model):
         """Return string representation of the user interest."""
         return f'<UserInterest {self.category}:{self.subcategory}>'
 
+class EventAttendee(db.Model):
+    __tablename__ = 'event_attendees'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    event_id = db.Column(db.Integer, db.ForeignKey('event.id'), nullable=False)
+    joined_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        """Return string representation of the event attendee."""
+        return f'<EventAttendee user_id={self.user_id}, event_id={self.event_id}>'
+
+
+class Event(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    location = db.Column(db.String(100), nullable=False)  # Added location field
+    date = db.Column(db.DateTime, nullable=False)
+    privacy = db.Column(db.String(20), nullable=False)
+    organizer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    event_popularity = db.Column(db.Float, default=0.5)
+    attendees = db.relationship('EventAttendee', backref='event', lazy=True)
+    
+    def get_attendee_count(self):
+        """Return the number of attendees for the event."""
+        return EventAttendee.query.filter_by(event_id=self.id).count()
+
 from sqlalchemy import inspect
 
 def init_db():
@@ -66,16 +98,6 @@ def init_db():
         db.create_all()
         inspector = inspect(db.engine)
         print("Current tables:", inspector.get_table_names())
-
-class Event(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(100), nullable=False)
-    description = db.Column(db.Text, nullable=True)
-    date = db.Column(db.DateTime, nullable=False)
-    privacy = db.Column(db.String(20), nullable=False)
-    organizer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    event_popularity = db.Column(db.Float, default=0.5)
-
 
 
 @login_manager.user_loader
@@ -129,6 +151,15 @@ def home():
     )
     
     return render_template('home.html', events=events)
+
+
+@app.route('/browse_local_events')
+@login_required
+def browse_local_events():
+    # Get all events from the database (not from SerpAPI)
+    all_events = Event.query.filter_by(privacy='public').all()
+    return render_template('browse_local_events.html', events=all_events)
+
 
 @app.route('/api/events')
 def api_events():
@@ -274,6 +305,7 @@ def create_event():
         event = Event(
             title=request.form['title'],
             description=request.form['description'],
+            location=request.form['location'],  # Added location field
             date=datetime.strptime(request.form['date'], '%Y-%m-%d'),
             privacy=request.form['privacy'],
             organizer_id=current_user.id,
@@ -282,14 +314,118 @@ def create_event():
         db.session.add(event)
         db.session.commit()
         flash('Event created successfully')
-        return redirect(url_for('index'))
+        return redirect(url_for('my_events'))
     return render_template('create_event.html')
+
+@app.route('/edit_event/<int:event_id>', methods=['GET', 'POST'])
+@login_required
+def edit_event(event_id):
+    event = Event.query.get_or_404(event_id)
+    
+    # Ensure only the organizer can edit the event
+    if event.organizer_id != current_user.id:
+        flash('You do not have permission to edit this event.')
+        return redirect(url_for('my_events'))
+    
+    if request.method == 'POST':
+        event.title = request.form['title']
+        event.description = request.form['description']
+        event.location = request.form['location']
+        event.date = datetime.strptime(request.form['date'], '%Y-%m-%d')
+        event.privacy = request.form['privacy']
+        event.event_popularity = float(request.form['event_popularity'])
+        
+        db.session.commit()
+        flash('Event updated successfully')
+        return redirect(url_for('my_events'))
+    
+    return render_template('edit_event.html', event=event)
 
 @app.route('/my_events')
 @login_required
 def my_events():
     events = Event.query.filter_by(organizer_id=current_user.id).all()
     return render_template('my_events.html', events=events)
+
+@app.route('/join_event/<int:event_id>', methods=['POST'])
+@login_required
+def join_event(event_id):
+    event = Event.query.get_or_404(event_id)
+    
+    # Check if user is already attending
+    existing_attendee = EventAttendee.query.filter_by(
+        user_id=current_user.id, 
+        event_id=event_id
+    ).first()
+    
+    if existing_attendee:
+        flash('You are already attending this event.')
+        return redirect(url_for('event_details', event_id=event_id))
+    
+    # Create new attendee record
+    attendee = EventAttendee(
+        user_id=current_user.id,
+        event_id=event_id,
+        joined_at=datetime.utcnow()
+    )
+    
+    db.session.add(attendee)
+    db.session.commit()
+    
+    flash('You have successfully joined the event!')
+    return redirect(url_for('event_details', event_id=event_id))
+
+@app.route('/leave_event/<int:event_id>', methods=['POST'])
+@login_required
+def leave_event(event_id):
+    # Find and delete the attendee record
+    attendee = EventAttendee.query.filter_by(
+        user_id=current_user.id, 
+        event_id=event_id
+    ).first()
+    
+    if attendee:
+        db.session.delete(attendee)
+        db.session.commit()
+        flash('You have left the event.')
+    else:
+        flash('You are not attending this event.')
+    
+    return redirect(url_for('event_details', event_id=event_id))
+
+@app.route('/event/<int:event_id>')
+def event_details(event_id):
+    event = Event.query.get_or_404(event_id)
+    
+    # Check if current user is attending
+    is_attending = False
+    if current_user.is_authenticated:
+        is_attending = EventAttendee.query.filter_by(
+            user_id=current_user.id, 
+            event_id=event_id
+        ).first() is not None
+    
+    # Get all attendees
+    attendees = User.query.join(EventAttendee).filter(
+        EventAttendee.event_id == event_id
+    ).all()
+    
+    return render_template(
+        'event_details.html', 
+        event=event, 
+        is_attending=is_attending,
+        attendees=attendees
+    )
+
+@app.route('/joined_events')
+@login_required
+def joined_events():
+    # Get all events the user has joined
+    joined_events = Event.query.join(EventAttendee).filter(
+        EventAttendee.user_id == current_user.id
+    ).all()
+    
+    return render_template('joined_events.html', events=joined_events)
 
 
 class RecommendationService:
@@ -315,10 +451,12 @@ class RecommendationService:
                     'id': event.id,
                     'title': event.title,
                     'description': event.description or '',
+                    'location': event.location,  # Added location field
                     'date': event.date.isoformat() if event.date else datetime.utcnow().isoformat(),
                     'privacy': event.privacy or 'public',
                     'event_popularity': float(event.event_popularity if event.event_popularity is not None else 0.5),
-                    'invited': 0  # Adding default value for invited field
+                    'invited': 0,  # Adding default value for invited field
+                    'attendee_count': event.get_attendee_count()  # Add attendee count
                 }
                 events_data.append(event_dict)
 
@@ -345,6 +483,7 @@ class RecommendationService:
         except Exception as e:
             print(f"Error getting recommendations: {e}")
             return []
+            
 # Initialize recommendation service
 ai_api = os.getenv("AI_API")
 recommendation_service = RecommendationService(ai_api)
@@ -384,6 +523,68 @@ def recommendations():
         app.logger.error(f"Error in recommendations: {str(e)}")
         flash('Error generating recommendations. Please try again later.', 'error')
         return redirect(url_for('index'))
+
+def generate_dummy_events(count=20):
+    """Generate dummy events using Faker library."""
+    fake = Faker()
+    
+    # Get all users for random assignment
+    users = User.query.all()
+    if not users:
+        app.logger.warning("No users found to assign dummy events to.")
+        return
+    
+    # Event categories for more realistic data
+    categories = [
+        "Music Concert", "Tech Conference", "Food Festival", 
+        "Art Exhibition", "Sports Game", "Charity Run",
+        "Workshop", "Networking", "Movie Screening", "Book Club"
+    ]
+    
+    # Locations - mix of real cities
+    locations = [
+        "New York, NY", "San Francisco, CA", "Chicago, IL", 
+        "Austin, TX", "Seattle, WA", "Boston, MA",
+        "Los Angeles, CA", "Miami, FL", "Denver, CO", "Atlanta, GA"
+    ]
+    
+    # Privacy options
+    privacy_options = ["public", "private", "invitation"]
+    
+    # Generate events
+    events_created = 0
+    for _ in range(count):
+        # Create event with random data
+        event = Event(
+            title=fake.sentence(nb_words=4).rstrip('.'),
+            description=fake.paragraph(nb_sentences=3),
+            location=random.choice(locations),
+            date=fake.date_time_between(start_date='now', end_date='+90d'),
+            privacy=random.choice(privacy_options),
+            organizer_id=random.choice(users).id,
+            event_popularity=round(random.uniform(0.1, 1.0), 2)
+        )
+        
+        db.session.add(event)
+        events_created += 1
+    
+    try:
+        db.session.commit()
+        app.logger.info(f"Successfully created {events_created} dummy events.")
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error creating dummy events: {e}")
+
+@app.route('/generate_dummy_events', methods=['GET', 'POST'])
+@login_required
+def generate_dummy_events_route():
+    if request.method == 'POST':
+        count = int(request.form.get('count', 20))
+        generate_dummy_events(count)
+        flash(f'Successfully generated {count} dummy events!')
+        return redirect(url_for('my_events'))
+    
+    return render_template('generate_dummy_events.html')
 
 if __name__ == '__main__':
     if not os.getenv('SERPAPI_KEY'):
