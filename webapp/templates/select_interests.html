@@ -58,13 +58,13 @@
             </div>
 
             <div class="flex justify-between mt-8">
-                <button type="button" class="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+                <a href="{{ url_for('home') }}" type="button" class="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
                     Exit
-                </button>
+                </a>
                 <button type="submit" 
                         class="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50"
                         :disabled="selectedTags.length === 0">
-                    Next
+                    Submit
                 </button>
             </div>
         </div>

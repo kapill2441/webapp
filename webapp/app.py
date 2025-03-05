@@ -1,109 +1,48 @@
-# main webapp
+# webapp/app.py
 from flask import Flask, jsonify, render_template, request, redirect, url_for, flash
-from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 import requests
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import os
-from serpAPIService import EventService
+from webapp.serpAPIService import EventService
 import logging
 from flask import current_app
-from dotenv import load_dotenv
 import random
-import faker
 from faker import Faker
 
-load_dotenv(".env.local")
+# Import models using relative imports
+from webapp.models import db, User, UserInterests, EventAttendee, Event
+
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Get the project root directory
+project_root = Path(__file__).parent.parent.absolute()
+
+# Load environment variables from .env.local in the project root
+env_path = project_root / '.env.local'
+print(f"Looking for .env.local at: {env_path}")
+load_dotenv(env_path)
 
 app = Flask(__name__)
 app.logger.setLevel(logging.DEBUG)
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///smart_event_organizer.db'
-db = SQLAlchemy(app)
+# Update database URI for PostgreSQL
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/event_organizer")
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Initialize the database with the app
+db.init_app(app)
+
+# Initialize the Flask-Login extension
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
-
-
-# Models
-class User(UserMixin, db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128))
-    events = db.relationship('Event', backref='organizer', lazy=True)
-    birthyear = db.Column(db.Integer)
-    gender = db.Column(db.String(10))
-    locale = db.Column(db.String(10))
-    location = db.Column(db.String(100))
-    timezone = db.Column(db.Integer)
-    joinedAt = db.Column(db.DateTime, default=datetime.utcnow)
-    interests = db.relationship('UserInterests', backref='user', lazy=True)
-    joined_events = db.relationship('EventAttendee', backref='user', lazy=True)
-
-    def set_password(self, password):
-        """Set the password hash for the user."""
-        self.password_hash = generate_password_hash(password)
-
-    def check_password(self, password):
-        """Check if the provided password matches the hash."""
-        return check_password_hash(self.password_hash, password)
-
-    def __repr__(self):
-        """Return string representation of the user."""
-        return f'<User {self.username}>'
-
-class UserInterests(db.Model):
-    __tablename__ = 'user_interests'
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    category = db.Column(db.String(50), nullable=False)
-    subcategory = db.Column(db.String(50), nullable=False)
-
-    def __repr__(self):
-        """Return string representation of the user interest."""
-        return f'<UserInterest {self.category}:{self.subcategory}>'
-
-class EventAttendee(db.Model):
-    __tablename__ = 'event_attendees'
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    event_id = db.Column(db.Integer, db.ForeignKey('event.id'), nullable=False)
-    joined_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    def __repr__(self):
-        """Return string representation of the event attendee."""
-        return f'<EventAttendee user_id={self.user_id}, event_id={self.event_id}>'
-
-
-class Event(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(100), nullable=False)
-    description = db.Column(db.Text, nullable=True)
-    location = db.Column(db.String(100), nullable=False)  # Added location field
-    date = db.Column(db.DateTime, nullable=False)
-    privacy = db.Column(db.String(20), nullable=False)
-    organizer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    event_popularity = db.Column(db.Float, default=0.5)
-    attendees = db.relationship('EventAttendee', backref='event', lazy=True)
-    
-    def get_attendee_count(self):
-        """Return the number of attendees for the event."""
-        return EventAttendee.query.filter_by(event_id=self.id).count()
-
-from sqlalchemy import inspect
-
-def init_db():
-    with app.app_context():
-        db.create_all()
-        inspector = inspect(db.engine)
-        print("Current tables:", inspector.get_table_names())
-
 
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
-
 
 # Routes
 @app.route('/')
@@ -305,7 +244,7 @@ def create_event():
         event = Event(
             title=request.form['title'],
             description=request.form['description'],
-            location=request.form['location'],  # Added location field
+            location=request.form['location'],
             date=datetime.strptime(request.form['date'], '%Y-%m-%d'),
             privacy=request.form['privacy'],
             organizer_id=current_user.id,
@@ -451,7 +390,7 @@ class RecommendationService:
                     'id': event.id,
                     'title': event.title,
                     'description': event.description or '',
-                    'location': event.location,  # Added location field
+                    'location': event.location,
                     'date': event.date.isoformat() if event.date else datetime.utcnow().isoformat(),
                     'privacy': event.privacy or 'public',
                     'event_popularity': float(event.event_popularity if event.event_popularity is not None else 0.5),
@@ -587,7 +526,10 @@ def generate_dummy_events_route():
     return render_template('generate_dummy_events.html')
 
 if __name__ == '__main__':
-    if not os.getenv('SERPAPI_KEY'):
-        print("WARNING: SERPAPI_KEY environment variable not set!")
-    init_db()
-    app.run(host='0.0.0.0', debug=True, use_reloader=False)
+    required_env_vars = ['SERPAPI_KEY', 'SECRET_KEY', 'DATABASE_URL', 'AI_API']
+    missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+    
+    if missing_vars:
+        print(f"WARNING: Missing environment variables: {', '.join(missing_vars)}")
+        exit(1)
+    app.run(host='0.0.0.0',port=8080,debug=True, use_reloader=False)

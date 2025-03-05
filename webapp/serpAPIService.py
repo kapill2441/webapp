@@ -1,3 +1,4 @@
+# webapp/serpAPIService.py
 from serpapi import GoogleSearch
 from datetime import datetime, date, timedelta
 import os
@@ -109,7 +110,7 @@ class EventService:
                 formatted_event = {
                     "title": event.get("title", ""),
                     "description": event.get("description", ""),
-                    "date": self._parse_date(event),  # Changed this line
+                    "date": self._parse_date(event),
                     "address": event.get("address", []),
                     "link": event.get("link", ""),
                     "venue": event.get("venue", {}).get("name", "") if isinstance(event.get("venue"), dict) else "",

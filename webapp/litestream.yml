@@ -1,0 +1,12 @@
+access-key-id: ${AWS_ACCESS_KEY_ID}
+secret-access-key: ${AWS_SECRET_ACCESS_KEY}
+
+dbs:
+  - path: ./instance/smart_event_organizer.db 
+    replicas:
+      - url: s3://${S3_BUCKET}/smart_event_organizer.db
+        region: ap-southeast-2
+        sync-interval: 5m        # Sync changes every 5 minutes for better data safety
+        snapshot:
+          interval: 4h          # Full backup every 4 hours
+          retention: 72h        # Keep snapshots for 3 days

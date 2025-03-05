@@ -8,3 +8,5 @@ python-dotenv
 google-search-results
 requests==2.31.0
 Faker==19.13.0
+psycopg2-binary
+Flask-Migrate
