@@ -102,3 +102,11 @@ generate-dummy-events:
 	$(PYTHON) -c "from webapp.app import app, generate_dummy_events; \
 		with app.app_context(): \
 			generate_dummy_events($$count)"
+
+# flask seed-db
+# export FLASK_APP=webapp.app
+# # Or specify custom numbers
+# flask seed-db --users=100 --events=50
+
+# # Reset the database before seeding
+# flask seed-db --reset

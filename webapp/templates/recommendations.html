@@ -1,58 +1,105 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-12 bg-gray-50">
-    <h2 class="text-3xl font-bold mb-8 text-center text-gray-800">
-        Discover Events Just for You
-    </h2>
+<div class="bg-white rounded-lg shadow-md p-6 mb-8">
+    <h1 class="text-2xl font-bold text-gray-800 mb-6">Personalized Event Recommendations</h1>
     
-    <!-- Loading State -->
-    <div id="loading-state" class="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-        <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-        <p class="text-gray-600 text-lg">Finding the perfect events for you...</p>
-    </div>
-
-    <!-- Content State -->
-    <div id="content-state" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 hidden">
-        {% for event, score in recommended_events %}
-        <div class="bg-white rounded-xl shadow-lg overflow-hidden transform hover:scale-105 transition-transform duration-300">
-            <div class="w-full h-10 bg-gradient-to-r from-blue-500 to-purple-500"></div>
-            
-            <div class="p-6">
-                <h5 class="text-xl font-bold mb-3 text-gray-900">{{ event.title }}</h5>
-                <p class="text-gray-600 mb-4 line-clamp-3">{{ event.description }}</p>
+    <div class="mb-6" x-data="filterController()">
+        
+        <!-- Recommendations display -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for event, score in recommended_events %}
+            <div class="bg-white rounded-lg shadow overflow-hidden flex flex-col h-full">
+                <!-- Event image or placeholder -->
+                <div class="h-40 bg-indigo-100 flex items-center justify-center">
+                    <svg class="h-12 w-12 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                </div>
                 
-                <div class="space-y-3">
-                    <div class="flex items-center text-gray-500">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        <span class="text-sm">{{ event.date.strftime('%B %d, %Y') }}</span>
+                <!-- Event details -->
+                <div class="p-4 flex-grow">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-lg font-semibold text-gray-800 truncate">{{ event.title }}</h3>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                            {{ (score * 100)|round|int }}% match
+                        </span>
                     </div>
                     
-                    <div class="flex items-center text-gray-500">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                    <p class="text-sm text-gray-600 mb-4 line-clamp-2">{{ event.description }}</p>
+                    
+                    <div class="flex items-center text-sm text-gray-500 mb-2">
+                        <svg class="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
-                        <span class="text-sm">Match Score: {{ (score * 100)|round|int }}%</span>
+                        <span class="truncate">{{ event.location }}</span>
+                    </div>
+                    
+                    <div class="flex items-center text-sm text-gray-500 mb-4">
+                        <svg class="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span>{{ event.date.strftime('%d %b, %Y') }}</span>
+                    </div>
+                    
+                    <!-- Attendee count -->
+                    <div class="flex items-center text-sm text-gray-500 mb-4">
+                        <svg class="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                        <span>{{ event.get_attendee_count() }} attending</span>
                     </div>
                 </div>
+                
+                <!-- Event actions -->
+                <div class="px-4 py-3 bg-gray-50 border-t border-gray-200 flex justify-between">
+                    <a href="{{ url_for('event_details', event_id=event.id) }}" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
+                        Details
+                    </a>
+                    
+                    <form action="{{ url_for('join_event', event_id=event.id) }}" method="POST" class="inline">
+                        <button type="submit" class="ml-4 bg-indigo-600 text-white px-4 py-1 rounded text-sm hover:bg-indigo-700 transition">
+                            Join Event
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- No recommendations message -->
+        {% if recommended_events|length == 0 %}
+        <div class="text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">No recommendations found</h3>
+            <p class="mt-1 text-sm text-gray-500">Try updating your preferences or check back later for new events.</p>
+            <div class="mt-6">
+                <a href="{{ url_for('select_interests') }}" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Update Preferences
+                </a>
+                <a href="{{ url_for('browse_local_events') }}" class="inline-flex items-center ml-3 px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Browse All Events
+                </a>
             </div>
         </div>
-        {% endfor %}
+        {% endif %}
+    </div>
+    
+    <!-- Add Google Calendar Integration section -->
+    <div class="mt-10 pt-6 border-t border-gray-200">
+        <h2 class="text-lg font-semibold text-gray-700 mb-4">Sync with Google Calendar</h2>
+        <p class="text-sm text-gray-600 mb-4">Keep track of all your joined events by syncing them with your Google Calendar.</p>
+        <a href="#" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            <svg class="h-5 w-5 mr-2 -ml-1" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M21.5 9.5h-3.75v-5h-1.5v5h-3.75v1.5h3.75v5h1.5v-5h3.75v-1.5z" />
+                <path d="M4.5 19.5h15a3 3 0 003-3V7.5a3 3 0 00-3-3h-15a3 3 0 00-3 3v9a3 3 0 003 3z" opacity=".3" />
+                <path d="M4.5 4.5c-1.66 0-3 1.34-3 3v9c0 1.66 1.34 3 3 3h15c1.66 0 3-1.34 3-3v-9c0-1.66-1.34-3-3-3h-15zm15 13.5h-15a1.5 1.5 0 01-1.5-1.5v-9a1.5 1.5 0 011.5-1.5h15a1.5 1.5 0 011.5 1.5v9a1.5 1.5 0 01-1.5 1.5z" />
+            </svg>
+            Connect Google Calendar
+        </a>
     </div>
 </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const loadingState = document.getElementById('loading-state');
-    const contentState = document.getElementById('content-state');
-    
-    // Show content after a short delay
-    setTimeout(() => {
-        loadingState.classList.add('hidden');
-        contentState.classList.remove('hidden');
-    }, 1000);
-});
-</script>
 {% endblock %}
