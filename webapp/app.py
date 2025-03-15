@@ -371,8 +371,31 @@ def joined_events():
 class RecommendationService:
     def __init__(self, api_url):
         self.api_url = api_url
-        self.min_recommendations = 10  # Ensure at least 10 recommended events
+        self.min_recommendations = 10
+        print(f"Initializing RecommendationService with API URL: {api_url}")
+        
+        # Test API connectivity
+        try:
+            response = requests.get(f"{api_url}/health", timeout=2)
+            if response.status_code == 200:
+                print("API connection successful!")
+            else:
+                print(f"API connection test failed with status: {response.status_code}")
+        except requests.RequestException as e:
+            print(f"API connection test failed: {e}")
 
+    def _safe_get_day_difference(self, event):
+        """Safely calculate days until event, handling None dates"""
+        if event.date is None:
+            # Default to 30 days in the future if no date
+            return 30
+        
+        try:
+            return (event.date - datetime.utcnow()).days
+        except Exception as e:
+            print(f"Error calculating days difference: {e}")
+            return 30  # Default fallback
+    
     def get_user_interests(self, user_id):
         """Get user interests from database"""
         interests = []
@@ -390,31 +413,31 @@ class RecommendationService:
     def get_recommendations(self, user, events):
         """
         Get personalized event recommendations
-        Uses both AI model and fallback mechanisms
+        Uses AI model with better error handling
         """
-        try:
-            # Prepare user data with default values for missing fields
-            user_data = {
-                'birthyear': user.birthyear or 1990,
-                'gender': user.gender or 'unknown',
-                'locale': user.locale or 'unknown',
-                'location': user.location or 'unknown',
-                'timezone': user.timezone or 0,
-                'joinedAt': user.joinedAt.isoformat() if user.joinedAt else datetime.utcnow().isoformat(),
-                'latitude': user.latitude,
-                'longitude': user.longitude,
-                'precise_location_enabled': user.precise_location_enabled
-            }
+        # Prepare user data with default values for missing fields
+        user_data = {
+            'birthyear': user.birthyear or 1990,
+            'gender': user.gender or 'unknown',
+            'locale': user.locale or 'unknown',
+            'location': user.location or 'unknown',
+            'timezone': user.timezone or 0,
+            'joinedAt': user.joinedAt.isoformat() if user.joinedAt else datetime.utcnow().isoformat(),
+            'latitude': user.latitude,
+            'longitude': user.longitude,
+            'precise_location_enabled': user.precise_location_enabled
+        }
 
-            # Get user interests
-            user_interests = self.get_user_interests(user.id)
+        # Get user interests
+        user_interests = self.get_user_interests(user.id)
 
-            # Get user interactions for learning
-            user_interactions = self._get_user_interactions(user.id)
+        # Get user interactions for learning
+        user_interactions = self._get_user_interactions(user.id)
 
-            # Prepare event data ensuring all required fields are present
-            events_data = []
-            for event in events:
+        # Prepare event data ensuring all required fields are present
+        events_data = []
+        for event in events:
+            try:
                 # Calculate distance from user if location data available
                 distance = None
                 if user.latitude and user.longitude and event.latitude and event.longitude:
@@ -423,6 +446,9 @@ class RecommendationService:
                         event.latitude, event.longitude
                     )
                 
+                # Safely get day difference
+                days_until_event = self._safe_get_day_difference(event)
+                
                 event_dict = {
                     'id': event.id,
                     'title': event.title,
@@ -430,75 +456,68 @@ class RecommendationService:
                     'location': event.location,
                     'latitude': event.latitude,
                     'longitude': event.longitude,
-                    'date': event.date.isoformat() if event.date else datetime.utcnow().isoformat(),
+                    'date': event.date.isoformat() if event.date else (datetime.utcnow() + timedelta(days=30)).isoformat(),
                     'privacy': event.privacy or 'public',
-                    'category': event.category,
-                    'subcategory': event.subcategory,
+                    'category': event.category or 'unknown',
+                    'subcategory': event.subcategory or 'unknown',
                     'event_popularity': float(event.event_popularity if event.event_popularity is not None else 0.5),
                     'invited': 0,  # Adding default value for invited field
                     'attendee_count': event.get_attendee_count(),  # Add attendee count
-                    'days_until_event': event.get_day_difference(),
+                    'days_until_event': days_until_event,
                     'distance_km': distance,
-                    'is_trending': event.calculate_trending_score() > 70,
-                    'created_at': event.created_at.isoformat() if event.created_at else None
+                    'is_trending': getattr(event, 'calculate_trending_score', lambda: 50)() > 70,
+                    'created_at': event.created_at.isoformat() if event.created_at else datetime.utcnow().isoformat()
                 }
                 events_data.append(event_dict)
+            except Exception as e:
+                print(f"Error preparing event data for event {event.id}: {e}")
+                # Skip this event rather than failing the entire request
+                continue
 
-            # Prepare request data
-            request_data = {
-                'user': {'id': user.id},
-                'events': events_data,
-                'user_data': user_data,
-                'user_interests': user_interests,
-                'user_interactions': user_interactions
-            }
+        # Prepare request data
+        request_data = {
+            'user': {'id': user.id},
+            'events': events_data,
+            'user_data': user_data,
+            'user_interests': user_interests,
+            'user_interactions': user_interactions
+        }
 
-            # Make API request
+        try:
+            # Log the request for debugging
+            print(f"Sending request to AI API: {self.api_url}")
+            
+            # Make API request with increased timeout
             response = requests.post(
                 f"{self.api_url}/api/recommendations",
                 json=request_data,
                 headers={'Content-Type': 'application/json'},
-                timeout=5  # Add timeout to prevent long-running requests
+                timeout=10  # Increased timeout
             )
             
             if response.status_code == 200:
-                recommendations = response.json()['recommendations']
+                # Get the recommendations from the API response
+                api_recommendations = response.json().get('recommendations', [])
                 
-                # If AI model returned fewer than minimum required recommendations,
-                # supplement with fallback recommendations
-                if len(recommendations) < self.min_recommendations:
-                    app.logger.info(f"AI model returned {len(recommendations)} recommendations, " 
-                                   f"supplementing with fallback recommendations")
+                # Process the recommendations to match the expected format in the webapp
+                processed_recommendations = []
+                for rec in api_recommendations:
+                    processed_recommendations.append({
+                        'event_id': rec.get('event_id'),
+                        'score': rec.get('score'),
+                        'title': rec.get('title', '')
+                    })
                     
-                    # Get IDs of already recommended events
-                    recommended_ids = {rec['event']['id'] for rec in recommendations}
-                    
-                    # Generate fallback recommendations for events not already recommended
-                    remaining_events = [e for e in events if e.id not in recommended_ids]
-                    fallback_recs = self._generate_fallback_recommendations(
-                        user, 
-                        remaining_events, 
-                        user_interests,
-                        count=self.min_recommendations - len(recommendations)
-                    )
-                    
-                    # Combine recommendations
-                    recommendations.extend(fallback_recs)
-                
-                return recommendations
+                return processed_recommendations
             else:
-                app.logger.error(f"API Response: {response.text}")  # Debug print
-                # If API request fails, fall back to local recommendation logic
-                app.logger.warning("API request failed, using fallback recommendation system")
-                return self._generate_fallback_recommendations(user, events, user_interests)
-
+                print(f"API Error Response ({response.status_code}): {response.text}")
+                return []  # Return empty list on error
         except requests.RequestException as e:
-            app.logger.error(f"Request error getting recommendations: {e}")
-            # If API is unavailable, use fallback recommendations
-            return self._generate_fallback_recommendations(user, events, user_interests)
+            print(f"Request error getting recommendations: {e}")
+            return []  # Return empty list on error
         except Exception as e:
-            app.logger.error(f"Error getting recommendations: {e}")
-            return self._generate_fallback_recommendations(user, events, user_interests)
+            print(f"Error getting recommendations: {e}")
+            return []  # Return empty list on error
     
     def _get_user_interactions(self, user_id):
         """Get recent user interactions for recommendation learning"""
@@ -655,14 +674,17 @@ def recommendations():
             public_events
         )
 
-        # Process recommendations for template using session.get()
-        recommended_events = [
-            (
-                db.session.get(Event, rec['event']['id']),
-                rec['score']
-            )
-            for rec in recommendations
-        ]
+        # Process recommendations for template
+        recommended_events = []
+        for rec in recommendations:
+            # Check the response structure - the API now returns event_id directly
+            event_id = rec.get('event_id')
+            if event_id is None:
+                continue  # Skip this recommendation if event_id is missing
+                
+            event = db.session.get(Event, event_id)
+            if event:
+                recommended_events.append((event, rec['score']))
 
         return render_template(
             'recommendations.html',

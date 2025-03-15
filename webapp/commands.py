@@ -7,6 +7,7 @@ import random
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash
 import json
+import math
 
 # Initialize Faker
 fake = Faker()
@@ -58,13 +59,53 @@ def seed_db_command(users, events, reset):
         click.echo('Resetting database...')
         reset_database()
     
+    click.echo(f'Starting database seeding: {users} users, {events} events')
     seed_database(users, events)
     click.echo(f'Successfully created {users} users, {events} events, and related records.')
+    
+    # Verify data after seeding
+    verify_database()
+
+def verify_database():
+    """Verify the database has valid data after seeding."""
+    click.echo("\nVerifying database:")
+    
+    user_count = User.query.count()
+    click.echo(f"- Users: {user_count}")
+    
+    interest_count = UserInterests.query.count()
+    click.echo(f"- User Interests: {interest_count}")
+    
+    event_count = Event.query.count()
+    click.echo(f"- Events: {event_count}")
+    
+    attendee_count = EventAttendee.query.count()
+    click.echo(f"- Event Attendees: {attendee_count}")
+    
+    interaction_count = UserEventInteraction.query.count()
+    click.echo(f"- User-Event Interactions: {interaction_count}")
+    
+    # Check for events with null dates (should be none)
+    null_date_count = Event.query.filter(Event.date == None).count()
+    if null_date_count > 0:
+        click.echo(f"WARNING: Found {null_date_count} events with NULL dates!")
+    else:
+        click.echo("- All events have valid dates")
+    
+    # Test day difference calculation on a sample event
+    sample_event = Event.query.first()
+    if sample_event:
+        try:
+            days_diff = sample_event.get_day_difference()
+            click.echo(f"- Sample event day difference calculation: {days_diff} days")
+        except Exception as e:
+            click.echo(f"ERROR: Day difference calculation failed: {e}")
 
 def reset_database():
     """Drop all tables and recreate them."""
     db.drop_all()
     db.create_all()
+    click.echo("Database reset complete - all tables dropped and recreated.")
 
 def seed_database(num_users=50, num_events=20):
     """
@@ -77,17 +118,22 @@ def seed_database(num_users=50, num_events=20):
     num_events : int
         Number of events to create
     """
-    click.echo("Creating users...")
-    created_users = create_users(num_users)
-    
-    click.echo("Adding user interests...")
-    add_user_interests(created_users)
-    
-    click.echo("Creating events...")
-    created_events = create_events(num_events, created_users)
-    
-    click.echo("Creating event attendees and interactions...")
-    create_attendees_and_interactions(created_users, created_events)
+    with click.progressbar(length=4, label='Seeding database') as bar:
+        click.echo("Creating users...")
+        created_users = create_users(num_users)
+        bar.update(1)
+        
+        click.echo("Adding user interests...")
+        add_user_interests(created_users)
+        bar.update(1)
+        
+        click.echo("Creating events...")
+        created_events = create_events(num_events, created_users)
+        bar.update(1)
+        
+        click.echo("Creating event attendees and interactions...")
+        create_attendees_and_interactions(created_users, created_events)
+        bar.update(1)
 
 def create_users(num_users):
     """Create fake users with consistent password."""
@@ -130,10 +176,13 @@ def create_users(num_users):
         users.append(user)
     
     db.session.commit()
+    click.echo(f"Created {len(users)} users with username:password {users[0].username}:password123")
     return users
 
 def add_user_interests(users):
     """Add interests to users."""
+    total_interests = 0
+    
     for user in users:
         # Select 1-5 random categories
         selected_categories = random.sample(
@@ -160,13 +209,19 @@ def add_user_interests(users):
                     )
                 )
                 db.session.add(interest)
+                total_interests += 1
     
     db.session.commit()
+    click.echo(f"Added {total_interests} interests to users")
 
 def create_events(num_events, users):
-    """Create random events."""
+    """Create random events with guaranteed valid dates."""
     events = []
     
+    # Get current time for date calculations
+    now = datetime.utcnow()
+    
+    # Create a mix of past and future events
     for i in range(num_events):
         # Select a random organizer
         organizer = random.choice(users)
@@ -178,22 +233,32 @@ def create_events(num_events, users):
         # Select a random location (use exact values, no modifications)
         location = random.choice(LOCATIONS)
         
-        # Create future or past date for the event
-        if random.random() < 0.7:  # 70% chance of a future event
-            event_date = fake.date_time_between(start_date='now', end_date='+6m')
+        # Create future or past date for the event - ENSURING NO NULL DATES
+        is_future = random.random() < 0.7  # 70% chance of a future event
+        
+        if is_future:
+            # Future event: between tomorrow and 6 months ahead
+            days_ahead = random.randint(1, 180)
+            event_date = now + timedelta(days=days_ahead)
             # End date 1-5 hours after start date
             end_date = event_date + timedelta(hours=random.randint(1, 5))
         else:
-            event_date = fake.date_time_between(start_date='-6m', end_date=datetime.utcnow())
+            # Past event: between yesterday and 6 months ago
+            days_ago = random.randint(1, 180)
+            event_date = now - timedelta(days=days_ago)
             end_date = event_date + timedelta(hours=random.randint(1, 5))
+        
+        # Double-check that dates are not None
+        assert event_date is not None, "Event date cannot be None"
+        assert end_date is not None, "End date cannot be None"
         
         # Create event with exact location values
         event = Event(
             title=fake.sentence(nb_words=5)[:-1],  # Remove trailing period
             description=fake.paragraph(nb_sentences=3),
             location=location['name'],
-            date=event_date,
-            end_date=end_date,
+            date=event_date,  # Guaranteed to be non-null
+            end_date=end_date,  # Guaranteed to be non-null
             privacy=random.choice(['public', 'private']),  # Simplified privacy options
             organizer_id=organizer.id,
             event_popularity=random.uniform(0.2, 0.9),
@@ -201,21 +266,44 @@ def create_events(num_events, users):
             subcategory=subcategory,
             max_attendees=random.choice([None, 10, 20, 50, 100]),
             is_featured=random.random() < 0.1,  # 10% chance of being featured
-            created_at=fake.date_time_between(start_date='-1y', end_date=datetime.utcnow()),
+            created_at=fake.date_time_between(
+                start_date=event_date - timedelta(days=30),  # Created between 30 days before event
+                end_date=min(event_date, now)  # And either the event date or now, whichever is earlier
+            ),
             latitude=location['lat'],  # Use exact latitude
             longitude=location['lng'],  # Use exact longitude
-            event_metadata={
+            event_metadata=json.dumps({
                 'has_tickets': random.choice([True, False]),
                 'price': random.choice([None, 'Free', '$5', '$10', '$25', '$50']),
                 'dress_code': random.choice([None, 'Casual', 'Business Casual', 'Formal']),
                 'age_restriction': random.choice([None, '18+', '21+'])
-            }
+            })
         )
+        
+        # Verify that the day difference calculation works for this event
+        try:
+            # Make a dummy day difference calculation to catch any errors
+            current_time = datetime.utcnow()
+            delta = event_date - current_time
+            days_diff = delta.days
+        except Exception as e:
+            click.echo(f"WARNING: Day difference calculation failed for new event: {e}")
+            click.echo(f"Event date: {event_date}, Current time: {current_time}")
+            # Attempt to fix the date
+            event.date = now + timedelta(days=random.randint(1, 180))
         
         db.session.add(event)
         events.append(event)
     
     db.session.commit()
+    
+    # Verify no events have NULL dates
+    null_date_events = Event.query.filter(Event.date == None).count()
+    if null_date_events > 0:
+        click.echo(f"WARNING: {null_date_events} events still have NULL dates after creation!")
+    else:
+        click.echo(f"Created {len(events)} events with valid dates")
+    
     return events
 
 def create_attendees_and_interactions(users, events):
@@ -223,7 +311,15 @@ def create_attendees_and_interactions(users, events):
     # Common interaction types that recommendation systems typically expect
     interaction_types = ['view', 'click', 'join', 'share', 'bookmark']
     
+    total_attendees = 0
+    total_interactions = 0
+    
     for event in events:
+        # Ensure event.created_at is not None
+        if event.created_at is None:
+            event.created_at = datetime.utcnow() - timedelta(days=random.randint(1, 30))
+            db.session.add(event)
+        
         # Determine how many users will attend this event (between 0 and 50% of users)
         num_attendees = random.randint(0, len(users) // 2)
         attendee_users = random.sample(users, num_attendees)
@@ -232,48 +328,149 @@ def create_attendees_and_interactions(users, events):
             # Skip if user is the organizer (they're automatically attending)
             if user.id == event.organizer_id:
                 continue
+            
+            # Create attendee record with safe date handling
+            try:
+                # Ensure event.created_at is not None for comparison
+                event_created = event.created_at or datetime.utcnow() - timedelta(days=random.randint(1, 30))
                 
-            # Create attendee record
-            joined_at = fake.date_time_between(
-                start_date=event.created_at, 
-                end_date=min(event.date, datetime.utcnow())
-            )
-            
-            attendee = EventAttendee(
-                user_id=user.id,
-                event_id=event.id,
-                joined_at=joined_at,
-                status=random.choice(['attending', 'maybe', 'declined']),
-                synced_to_calendar=random.choice([True, False])
-            )
-            
-            if attendee.synced_to_calendar:
-                attendee.calendar_event_id = fake.uuid4()
+                # Calculate a safe joined_at time (between event creation and either now or event date)
+                if event.date > datetime.utcnow():
+                    # Future event
+                    joined_at = fake.date_time_between(
+                        start_date=event_created,
+                        end_date=datetime.utcnow()
+                    )
+                else:
+                    # Past event
+                    joined_at = fake.date_time_between(
+                        start_date=event_created,
+                        end_date=min(event.date, datetime.utcnow())
+                    )
                 
-            db.session.add(attendee)
-            
-            # Generate some interactions
-            num_interactions = random.randint(1, 5)
-            
-            for _ in range(num_interactions):
-                interaction_type = random.choice(interaction_types)
-                timestamp = fake.date_time_between(
-                    start_date=event.created_at,
-                    end_date=datetime.utcnow()
-                )
-                
-                interaction = UserEventInteraction(
+                attendee = EventAttendee(
                     user_id=user.id,
                     event_id=event.id,
-                    interaction_type=interaction_type,
-                    timestamp=timestamp,
-                    interaction_metadata={
-                        'duration': random.randint(10, 300) if interaction_type == 'view' else None,
-                        'source': random.choice(['search', 'recommendation', 'feed'])
-                    }
+                    joined_at=joined_at,
+                    status=random.choice(['attending', 'maybe', 'declined']),
+                    synced_to_calendar=random.choice([True, False])
                 )
                 
-                db.session.add(interaction)
+                if attendee.synced_to_calendar:
+                    attendee.calendar_event_id = fake.uuid4()
+                    
+                db.session.add(attendee)
+                total_attendees += 1
+                
+                # Generate some interactions
+                num_interactions = random.randint(1, 5)
+                
+                for _ in range(num_interactions):
+                    interaction_type = random.choice(interaction_types)
+                    
+                    # Ensure timestamp is not before event creation
+                    timestamp = fake.date_time_between(
+                        start_date=event_created,
+                        end_date=datetime.utcnow()
+                    )
+                    
+                    interaction = UserEventInteraction(
+                        user_id=user.id,
+                        event_id=event.id,
+                        interaction_type=interaction_type,
+                        timestamp=timestamp,
+                        interaction_metadata=json.dumps({
+                            'duration': random.randint(10, 300) if interaction_type == 'view' else None,
+                            'source': random.choice(['search', 'recommendation', 'feed'])
+                        })
+                    )
+                    
+                    db.session.add(interaction)
+                    total_interactions += 1
+            
+            except Exception as e:
+                click.echo(f"Error creating attendee/interaction: {e}")
+                continue
     
     # Final commit
     db.session.commit()
+    click.echo(f"Created {total_attendees} event attendees and {total_interactions} user-event interactions")
+
+# Add these methods to the Event model
+def add_event_model_methods():
+    """Add safer versions of methods to the Event model"""
+    
+    # Add get_day_difference method with better null handling
+    if not hasattr(Event, '_original_get_day_difference'):
+        Event._original_get_day_difference = Event.get_day_difference
+        
+        def safe_get_day_difference(self):
+            """Calculate days until event, handling None dates safely"""
+            if self.date is None:
+                return 30  # Default to 30 days in the future
+                
+            current_time = datetime.utcnow()
+            
+            # Convert datetime.date to datetime.datetime if needed
+            event_date = self.date
+            if isinstance(self.date, datetime.date) and not isinstance(self.date, datetime.datetime):
+                # Convert date to datetime at midnight
+                event_date = datetime.datetime.combine(self.date, datetime.time.min)
+            
+            try:
+                # Calculate difference in days
+                delta = event_date - current_time
+                return delta.days
+            except Exception as e:
+                print(f"Error calculating day difference for event {self.id}: {e}")
+                return 30  # Default fallback
+        
+        Event.get_day_difference = safe_get_day_difference
+    
+    # Add calculate_trending_score with better null handling
+    if not hasattr(Event, '_original_calculate_trending_score'):
+        Event._original_calculate_trending_score = Event.calculate_trending_score
+        
+        def safe_calculate_trending_score(self):
+            """Calculate a trending score for the event, safely handling None dates"""
+            score = 50  # Base score
+            
+            try:
+                # Factor 1: Event popularity (0-100 points)
+                if self.event_popularity is not None:
+                    popularity_score = float(self.event_popularity) * 100
+                    score += popularity_score * 0.3  # 30% weight for popularity
+                
+                # Factor 2: Recent creation (0-100 points)
+                if self.created_at is not None:
+                    days_since_created = (datetime.utcnow() - self.created_at).days
+                    recency_score = max(0, 100 - days_since_created * 5)  # 5 points per day
+                    score += recency_score * 0.2  # 20% weight for recency
+                
+                # Factor 3: Upcoming event (0-100 points)
+                if self.date is not None:
+                    days_until = self.get_day_difference()
+                    if days_until >= 0:  # Future event
+                        if days_until <= 7:  # Very soon (within a week)
+                            proximity_score = 100 - (days_until * 10)  # Closer is better
+                        elif days_until <= 30:  # Soon (within a month)
+                            proximity_score = 40 - ((days_until - 7) * 1)  # Gradual decrease
+                        else:  # Further away
+                            proximity_score = max(0, 40 - ((days_until - 30) * 0.5))  # Slow decline
+                        score += proximity_score * 0.2  # 20% weight for date proximity
+                
+                # Factor 4: Attendee count (0-100 points)
+                attendee_count = self.get_attendee_count()
+                if attendee_count > 0:
+                    # Logarithmic scale to favor events with more attendees
+                    attendee_score = min(100, 20 * math.log2(attendee_count + 1))
+                    score += attendee_score * 0.3  # 30% weight for attendees
+                
+                return min(100, max(0, score))  # Ensure score is between 0-100
+            except Exception as e:
+                print(f"Error calculating trending score for event {self.id}: {e}")
+                return 50  # Default score on error
+        
+        Event.calculate_trending_score = safe_calculate_trending_score
+
+    click.echo("Updated Event model methods for safer date handling")
