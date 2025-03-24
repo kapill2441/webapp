@@ -1,0 +1,111 @@
+<!-- templates/components/calendar_integration.html -->
+{% if current_user.is_authenticated %}
+<div class="mt-6 pt-4 border-t border-gray-200">
+    <h3 class="text-lg font-medium text-gray-900">Calendar Integration</h3>
+    
+    {% if not current_user.calendar_sync_enabled or not current_user.google_calendar_token %}
+    <!-- Not connected to Google Calendar -->
+    <div class="mt-2 flex items-center">
+        <span class="text-sm text-gray-500 mr-4">Connect to Google Calendar to add events</span>
+        <a href="{{ url_for('connect_google_calendar') }}" 
+           class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            <svg class="h-4 w-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 0C5.383 0 0 5.383 0 12s5.383 12 12 12 12-5.383 12-12S18.617 0 12 0zm4.5 16.5c0 .828-.672 1.5-1.5 1.5h-6c-.828 0-1.5-.672-1.5-1.5v-9c0-.828.672-1.5 1.5-1.5h6c.828 0 1.5.672 1.5 1.5v9zM16.5 9H12v3h4.5V9z"/>
+            </svg>
+            Connect Google Calendar
+        </a>
+    </div>
+    {% else %}
+    <!-- Connected to Google Calendar -->
+    <div class="mt-2" id="calendar-controls" data-event-id="{{ event.id }}">
+        {% if is_attending %}
+            {% set attendee = get_attendee(current_user.id, event.id) %}
+            {% if attendee and attendee.synced_to_calendar %}
+            <!-- Already in calendar -->
+            <div class="flex items-center">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mr-4">
+                    <svg class="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    Added to Calendar
+                </span>
+                <button type="button" 
+                      onclick="removeFromCalendar({{ event.id }})"
+                      class="inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Remove from Calendar
+                </button>
+            </div>
+            {% else %}
+            <!-- Not in calendar yet -->
+            <button type="button" 
+                  onclick="addToCalendar({{ event.id }})"
+                  class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <svg class="h-4 w-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 0C5.383 0 0 5.383 0 12s5.383 12 12 12 12-5.383 12-12S18.617 0 12 0zm4.5 16.5c0 .828-.672 1.5-1.5 1.5h-6c-.828 0-1.5-.672-1.5-1.5v-9c0-.828.672-1.5 1.5-1.5h6c.828 0 1.5.672 1.5 1.5v9zM16.5 9H12v3h4.5V9z"/>
+                </svg>
+                Add to Google Calendar
+            </button>
+            {% endif %}
+        {% else %}
+            <div class="text-sm text-gray-500">
+                You must join this event before adding it to your calendar.
+            </div>
+        {% endif %}
+    </div>
+    
+    <script>
+        function addToCalendar(eventId) {
+            fetch(`/api/add_to_calendar/${eventId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message
+                    alert(data.message);
+                    // Reload the page to update calendar status
+                    window.location.reload();
+                } else {
+                    // Show error message
+                    alert(`Error: ${data.error}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to add event to calendar. Please try again.');
+            });
+        }
+        
+        function removeFromCalendar(eventId) {
+            fetch(`/api/remove_from_calendar/${eventId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message
+                    alert(data.message);
+                    // Reload the page to update calendar status
+                    window.location.reload();
+                } else {
+                    // Show error message
+                    alert(`Error: ${data.error}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to remove event from calendar. Please try again.');
+            });
+        }
+    </script>
+    {% endif %}
+</div>
+{% endif %}

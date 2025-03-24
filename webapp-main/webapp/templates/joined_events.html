@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+
+{% block title %}Events I've Joined{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">Events I've Joined</h1>
+  </div>
+  
+  {% if events %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {% for event in events %}
+        <div class="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
+          <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold text-gray-900">{{ event.title }}</h3>
+              <span class="px-3 py-1 text-xs font-medium rounded-full 
+                  {% if event.privacy == 'public' %}
+                      bg-green-100 text-green-800
+                  {% else %}
+                      bg-yellow-100 text-yellow-800
+                  {% endif %}">
+                  {{ event.privacy }}
+              </span>
+            </div>
+            
+            <div class="grid grid-cols-1 gap-2 text-sm text-gray-500 mb-4">
+              <div class="flex items-center">
+                <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                {{ event.date.strftime('%B %d, %Y') }}
+              </div>
+              <div class="flex items-center">
+                <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                      d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                      d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                {{ event.location }}
+              </div>
+              <div class="flex items-center">
+                <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                </svg>
+                Organizer: {{ event.organizer.username }}
+              </div>
+            </div>
+            
+            <div class="flex space-x-2 mt-4">
+              <a href="{{ url_for('event_details', event_id=event.id) }}" 
+                 class="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                  View Details
+              </a>
+              <form action="{{ url_for('leave_event', event_id=event.id) }}" method="POST" class="inline">
+                <button type="submit" 
+                        class="inline-flex items-center px-3 py-1.5 border border-transparent shadow-sm text-xs font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                  Leave Event
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+      <div class="flex">
+        <div class="flex-shrink-0">
+          <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+          </svg>
+        </div>
+        <div class="ml-3">
+          <p class="text-sm text-blue-700">
+            You haven't joined any events yet. Explore our <a href="{{ url_for('home') }}" class="font-medium underline">event listings</a> to find events to join!
+          </p>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+  
+  <div class="mt-6 flex space-x-4">
+    <a href="{{ url_for('home') }}" 
+       class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+      Browse Events
+    </a>
+    <a href="{{ url_for('recommendations') }}" 
+       class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+      View Recommendations
+    </a>
+  </div>
+</div>
+{% endblock %}

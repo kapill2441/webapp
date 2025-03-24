@@ -1,0 +1,111 @@
+<!-- templates/base.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EventFlowAI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Add these script tags in the head or before closing body -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.43/moment-timezone-with-data.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash/4.17.21/lodash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-gray-50">
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="{{ url_for('index') }}" class="text-xl font-bold text-indigo-600">
+                        EventFlowAI
+                    </a>
+                </div>
+                
+                <!-- Mobile menu button -->
+                <div class="flex items-center sm:hidden">
+                    <button type="button" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100" 
+                            aria-controls="mobile-menu" aria-expanded="false">
+                        <span class="sr-only">Open main menu</span>
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Desktop menu -->
+                <div class="hidden sm:flex sm:items-center sm:ml-6">
+                    <div class="flex space-x-4">
+                        {% if current_user.is_authenticated %}
+                        <a href="{{ url_for('home') }}" class="text-gray-500 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Home</a>
+                        <a href="{{ url_for('create_event') }}" class="text-gray-500 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Create Event</a>
+                        <a href="{{ url_for('my_events') }}" class="text-gray-500 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">My Events</a>
+                        <a href="{{ url_for('joined_events') }}" class="text-gray-500 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Joined Events</a>
+                        <a href="{{ url_for('recommendations') }}" class="text-gray-500 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Recommendations</a>
+                        <a href="{{ url_for('update_preferences') }}" class="text-gray-500 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">My Preferences</a>
+                        <a href="{{ url_for('logout') }}" class="text-gray-500 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Logout</a>
+                        {% else %}
+                        <a href="{{ url_for('login') }}" class="bg-indigo-600 text-white hover:bg-indigo-700 px-4 py-2 rounded-md text-sm font-medium">Login</a>
+                        <a href="{{ url_for('register') }}" class="text-indigo-600 hover:text-indigo-700 px-4 py-2 rounded-md text-sm font-medium border border-indigo-600">Register</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile menu -->
+        <div class="sm:hidden" id="mobile-menu">
+            <div class="pt-2 pb-3 space-y-1">
+                {% if current_user.is_authenticated %}
+                <a href="{{ url_for('home') }}" class="text-gray-500 hover:text-indigo-600 block px-3 py-2 text-base font-medium">Home</a>
+                <a href="{{ url_for('create_event') }}" class="text-gray-500 hover:text-indigo-600 block px-3 py-2 text-base font-medium">Create Event</a>
+                <a href="{{ url_for('my_events') }}" class="text-gray-500 hover:text-indigo-600 block px-3 py-2 text-base font-medium">My Events</a>
+                <a href="{{ url_for('joined_events') }}" class="text-gray-500 hover:text-indigo-600 block px-3 py-2 text-base font-medium">Joined Events</a>
+                <a href="{{ url_for('recommendations') }}" class="text-gray-500 hover:text-indigo-600 block px-3 py-2 text-base font-medium">Recommendations</a>
+                <a href="{{ url_for('logout') }}" class="text-gray-500 hover:text-indigo-600 block px-3 py-2 text-base font-medium">Logout</a>
+                <a href="{{ url_for('update_preferences') }}" class="text-gray-500 hover:text-indigo-600 block px-3 py-2 text-base font-medium">My Preferences</a>
+                {% else %}
+                <a href="{{ url_for('login') }}" class="text-gray-500 hover:text-indigo-600 block px-3 py-2 text-base font-medium">Login</a>
+                <a href="{{ url_for('register') }}" class="text-gray-500 hover:text-indigo-600 block px-3 py-2 text-base font-medium">Register</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        <div class="mb-8 bg-blue-50 border-l-4 border-blue-400 p-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-blue-700">
+                        {{ messages[0] }}
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <script>
+        // Mobile menu toggle
+        const button = document.querySelector('[aria-controls="mobile-menu"]');
+        const menu = document.getElementById('mobile-menu');
+        
+        button.addEventListener('click', () => {
+            const expanded = button.getAttribute('aria-expanded') === 'true';
+            button.setAttribute('aria-expanded', !expanded);
+            menu.classList.toggle('hidden');
+        });
+    </script>
+</body>
+</html>
