@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <div class="bg-white shadow-md rounded-lg px-8 pt-6 pb-8 mb-4">
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Update Your Preferences</h1>
+        
+        <form action="{{ url_for('update_preferences') }}" method="post">
+            <div class="mb-6">
+                <h2 class="text-lg font-semibold text-gray-700 mb-4">Event Categories</h2>
+                <p class="text-sm text-gray-600 mb-4">Select the types of events you're interested in:</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Tech & Innovation -->
+                    <div class="interest-category bg-white border rounded-lg p-4">
+                        <h3 class="font-medium text-gray-800 mb-2">
+                            <input type="checkbox" id="tech" class="category-checkbox mr-2"
+                                   onchange="toggleCategory(this, 'tech-subcategories')">
+                            <label for="tech">Tech & Innovation</label>
+                        </h3>
+                        <div id="tech-subcategories" class="ml-6 space-y-2 text-sm">
+                            <div>
+                                <input type="checkbox" id="tech-startup" name="interests[]" value="Tech:Startups"
+                                       {% if 'Tech:Startups' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="tech-startup">Startups</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="tech-programming" name="interests[]" value="Tech:Programming"
+                                       {% if 'Tech:Programming' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="tech-programming">Programming</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="tech-ai" name="interests[]" value="Tech:AI & Machine Learning"
+                                       {% if 'Tech:AI & Machine Learning' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="tech-ai">AI & Machine Learning</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="tech-blockchain" name="interests[]" value="Tech:Blockchain"
+                                       {% if 'Tech:Blockchain' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="tech-blockchain">Blockchain</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Business & Professional -->
+                    <div class="interest-category bg-white border rounded-lg p-4">
+                        <h3 class="font-medium text-gray-800 mb-2">
+                            <input type="checkbox" id="business" class="category-checkbox mr-2"
+                                   onchange="toggleCategory(this, 'business-subcategories')">
+                            <label for="business">Business & Professional</label>
+                        </h3>
+                        <div id="business-subcategories" class="ml-6 space-y-2 text-sm">
+                            <div>
+                                <input type="checkbox" id="business-networking" name="interests[]" value="Business:Networking"
+                                       {% if 'Business:Networking' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="business-networking">Networking</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="business-leadership" name="interests[]" value="Business:Leadership"
+                                       {% if 'Business:Leadership' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="business-leadership">Leadership</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="business-marketing" name="interests[]" value="Business:Marketing"
+                                       {% if 'Business:Marketing' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="business-marketing">Marketing</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="business-finance" name="interests[]" value="Business:Finance"
+                                       {% if 'Business:Finance' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="business-finance">Finance</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Arts & Culture -->
+                    <div class="interest-category bg-white border rounded-lg p-4">
+                        <h3 class="font-medium text-gray-800 mb-2">
+                            <input type="checkbox" id="arts" class="category-checkbox mr-2"
+                                   onchange="toggleCategory(this, 'arts-subcategories')">
+                            <label for="arts">Arts & Culture</label>
+                        </h3>
+                        <div id="arts-subcategories" class="ml-6 space-y-2 text-sm">
+                            <div>
+                                <input type="checkbox" id="arts-music" name="interests[]" value="Arts:Music"
+                                       {% if 'Arts:Music' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="arts-music">Music</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="arts-film" name="interests[]" value="Arts:Film"
+                                       {% if 'Arts:Film' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="arts-film">Film</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="arts-theater" name="interests[]" value="Arts:Theater"
+                                       {% if 'Arts:Theater' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="arts-theater">Theater</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="arts-visual" name="interests[]" value="Arts:Visual Arts"
+                                       {% if 'Arts:Visual Arts' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="arts-visual">Visual Arts</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Community & Environment -->
+                    <div class="interest-category bg-white border rounded-lg p-4">
+                        <h3 class="font-medium text-gray-800 mb-2">
+                            <input type="checkbox" id="community" class="category-checkbox mr-2"
+                                   onchange="toggleCategory(this, 'community-subcategories')">
+                            <label for="community">Community & Environment</label>
+                        </h3>
+                        <div id="community-subcategories" class="ml-6 space-y-2 text-sm">
+                            <div>
+                                <input type="checkbox" id="community-volunteering" name="interests[]" value="Community:Volunteering"
+                                       {% if 'Community:Volunteering' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="community-volunteering">Volunteering</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="community-environment" name="interests[]" value="Community:Environment"
+                                       {% if 'Community:Environment' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="community-environment">Environment</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="community-education" name="interests[]" value="Community:Education"
+                                       {% if 'Community:Education' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="community-education">Education</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="community-charity" name="interests[]" value="Community:Charity"
+                                       {% if 'Community:Charity' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="community-charity">Charity</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Health & Wellness -->
+                    <div class="interest-category bg-white border rounded-lg p-4">
+                        <h3 class="font-medium text-gray-800 mb-2">
+                            <input type="checkbox" id="health" class="category-checkbox mr-2"
+                                   onchange="toggleCategory(this, 'health-subcategories')">
+                            <label for="health">Health & Wellness</label>
+                        </h3>
+                        <div id="health-subcategories" class="ml-6 space-y-2 text-sm">
+                            <div>
+                                <input type="checkbox" id="health-fitness" name="interests[]" value="Health:Fitness"
+                                       {% if 'Health:Fitness' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="health-fitness">Fitness</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="health-yoga" name="interests[]" value="Health:Yoga"
+                                       {% if 'Health:Yoga' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="health-yoga">Yoga</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="health-mental" name="interests[]" value="Health:Mental Health"
+                                       {% if 'Health:Mental Health' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="health-mental">Mental Health</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="health-nutrition" name="interests[]" value="Health:Nutrition"
+                                       {% if 'Health:Nutrition' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="health-nutrition">Nutrition</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sports & Recreation -->
+                    <div class="interest-category bg-white border rounded-lg p-4">
+                        <h3 class="font-medium text-gray-800 mb-2">
+                            <input type="checkbox" id="sports" class="category-checkbox mr-2"
+                                   onchange="toggleCategory(this, 'sports-subcategories')">
+                            <label for="sports">Sports & Recreation</label>
+                        </h3>
+                        <div id="sports-subcategories" class="ml-6 space-y-2 text-sm">
+                            <div>
+                                <input type="checkbox" id="sports-running" name="interests[]" value="Sports:Running"
+                                       {% if 'Sports:Running' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="sports-running">Running</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="sports-cycling" name="interests[]" value="Sports:Cycling"
+                                       {% if 'Sports:Cycling' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="sports-cycling">Cycling</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="sports-hiking" name="interests[]" value="Sports:Hiking"
+                                       {% if 'Sports:Hiking' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="sports-hiking">Hiking</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="sports-team" name="interests[]" value="Sports:Team Sports"
+                                       {% if 'Sports:Team Sports' in user_interests %}checked{% endif %}
+                                       class="subcategory-checkbox">
+                                <label for="sports-team">Team Sports</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex justify-end">
+                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                    Save Preferences
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Check parent categories if any subcategory is checked
+    function initializeCategories() {
+        document.querySelectorAll('.category-checkbox').forEach(checkbox => {
+            const categoryId = checkbox.id;
+            const subcategoriesDiv = document.getElementById(`${categoryId}-subcategories`);
+            
+            if (subcategoriesDiv) {
+                const subcategories = subcategoriesDiv.querySelectorAll('.subcategory-checkbox');
+                const anyChecked = Array.from(subcategories).some(sub => sub.checked);
+                
+                checkbox.checked = anyChecked;
+            }
+        });
+    }
+
+    // Toggle all subcategories when a category is checked/unchecked
+    function toggleCategory(checkbox, subcategoriesId) {
+        const subcategoriesDiv = document.getElementById(subcategoriesId);
+        const subcategories = subcategoriesDiv.querySelectorAll('.subcategory-checkbox');
+        
+        subcategories.forEach(sub => {
+            sub.checked = checkbox.checked;
+        });
+    }
+
+    // Also update parent category checkbox when subcategories change
+    function setupSubcategoryListeners() {
+        document.querySelectorAll('.subcategory-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                // Find parent category
+                const categoryDiv = this.closest('.interest-category');
+                if (categoryDiv) {
+                    const categoryCheckbox = categoryDiv.querySelector('.category-checkbox');
+                    if (categoryCheckbox) {
+                        const allSubcategories = categoryDiv.querySelectorAll('.subcategory-checkbox');
+                        const anyChecked = Array.from(allSubcategories).some(sub => sub.checked);
+                        
+                        categoryCheckbox.checked = anyChecked;
+                    }
+                }
+            });
+        });
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        initializeCategories();
+        setupSubcategoryListeners();
+    });
+</script>
+{% endblock %}
