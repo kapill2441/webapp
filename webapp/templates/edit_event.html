@@ -1,66 +1,147 @@
-{% extends 'base.html' %}
-
-{% block title %}Edit Event{% endblock %}
+{% extends "base.html" %}
 
 {% block content %}
 <div class="max-w-3xl mx-auto">
-  <h1 class="text-2xl font-bold text-gray-900 mb-6">Edit Event</h1>
-  
-  <div class="bg-white shadow rounded-lg">
-    <form method="POST" action="{{ url_for('edit_event', event_id=event.id) }}" class="p-6">
-      <div class="grid grid-cols-1 gap-6">
-        <div>
-          <label for="title" class="block text-sm font-medium text-gray-700">Event Title</label>
-          <input type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                id="title" name="title" value="{{ event.title }}" required>
-        </div>
+    <div class="bg-white shadow-md rounded-lg px-8 pt-6 pb-8 mb-4">
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Edit Event</h1>
         
-        <div>
-          <label for="description" class="block text-sm font-medium text-gray-700">Description</label>
-          <textarea class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                    id="description" name="description" rows="4">{{ event.description }}</textarea>
-        </div>
-        
-        <div>
-          <label for="location" class="block text-sm font-medium text-gray-700">Location</label>
-          <input type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                id="location" name="location" value="{{ event.location }}" required>
-          <p class="mt-1 text-sm text-gray-500">Enter a city or specific venue location.</p>
-        </div>
-        
-        <div>
-          <label for="date" class="block text-sm font-medium text-gray-700">Date</label>
-          <input type="date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                id="date" name="date" value="{{ event.date.strftime('%Y-%m-%d') }}" required>
-        </div>
-        
-        <div>
-          <label for="privacy" class="block text-sm font-medium text-gray-700">Privacy</label>
-          <select class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                  id="privacy" name="privacy" required>
-            <option value="public" {% if event.privacy == 'public' %}selected{% endif %}>Public</option>
-            <option value="private" {% if event.privacy == 'private' %}selected{% endif %}>Private</option>
-            <option value="invitation" {% if event.privacy == 'invitation' %}selected{% endif %}>Invitation Only</option>
-          </select>
-        </div>
-        
-        <div>
-          <label for="event_popularity" class="block text-sm font-medium text-gray-700">Event Popularity (0.1 - 1.0)</label>
-          <input type="number" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                id="event_popularity" name="event_popularity" min="0.1" max="1.0" step="0.1" value="{{ event.event_popularity }}" required>
-          <p class="mt-1 text-sm text-gray-500">Higher values indicate more popular events.</p>
-        </div>
-      </div>
-      
-      <div class="mt-6 flex justify-end space-x-3">
-        <a href="{{ url_for('my_events') }}" class="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-          Cancel
-        </a>
-        <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-          Update Event
-        </button>
-      </div>
-    </form>
-  </div>
+        <form action="{{ url_for('edit_event', event_id=event.id) }}" method="post">
+            <div class="mb-4">
+                <label for="title" class="block text-gray-700 text-sm font-bold mb-2">Title</label>
+                <input type="text" id="title" name="title" value="{{ event.title }}" required 
+                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+            
+            <!-- Add Category and Subcategory fields -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label for="category" class="block text-gray-700 text-sm font-bold mb-2">Category</label>
+                    <select id="category" name="category" required
+                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                            onchange="updateSubcategories()">
+                        <option value="">Select a category</option>
+                        <option value="Tech" {% if event.category == 'Tech' %}selected{% endif %}>Technology</option>
+                        <option value="Business" {% if event.category == 'Business' %}selected{% endif %}>Business</option>
+                        <option value="Arts" {% if event.category == 'Arts' %}selected{% endif %}>Arts & Culture</option>
+                        <option value="Community" {% if event.category == 'Community' %}selected{% endif %}>Community</option>
+                        <option value="Health" {% if event.category == 'Health' %}selected{% endif %}>Health & Wellness</option>
+                        <option value="Sports" {% if event.category == 'Sports' %}selected{% endif %}>Sports & Recreation</option>
+                        <option value="Food" {% if event.category == 'Food' %}selected{% endif %}>Food & Drink</option>
+                        <option value="Education" {% if event.category == 'Education' %}selected{% endif %}>Education</option>
+                        <option value="Music" {% if event.category == 'Music' %}selected{% endif %}>Music</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="subcategory" class="block text-gray-700 text-sm font-bold mb-2">Subcategory</label>
+                    <select id="subcategory" name="subcategory" required
+                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                            data-current-subcategory="{{ event.subcategory }}">
+                        <option value="">Select a category first</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="mb-4">
+                <label for="description" class="block text-gray-700 text-sm font-bold mb-2">Description</label>
+                <textarea id="description" name="description" required rows="4"
+                          class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">{{ event.description }}</textarea>
+            </div>
+            
+            <div class="mb-4">
+                <label for="location" class="block text-gray-700 text-sm font-bold mb-2">Location</label>
+                <input type="text" id="location" name="location" value="{{ event.location }}" required 
+                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+            
+            <div class="mb-4">
+                <label for="date" class="block text-gray-700 text-sm font-bold mb-2">Date</label>
+                <input type="date" id="date" name="date" value="{{ event.date.strftime('%Y-%m-%d') }}" required 
+                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+            
+            <div class="mb-4">
+                <label for="privacy" class="block text-gray-700 text-sm font-bold mb-2">Privacy</label>
+                <select id="privacy" name="privacy" required
+                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    <option value="public" {% if event.privacy == 'public' %}selected{% endif %}>Public</option>
+                    <option value="private" {% if event.privacy == 'private' %}selected{% endif %}>Private</option>
+                </select>
+            </div>
+            
+            <div class="mb-6">
+                <label for="event_popularity" class="block text-gray-700 text-sm font-bold mb-2">Popularity (0-1)</label>
+                <input type="number" id="event_popularity" name="event_popularity" min="0" max="1" step="0.1" value="{{ event.event_popularity }}" required 
+                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+            
+            <div class="flex justify-end">
+                <a href="{{ url_for('my_events') }}" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline mr-2">
+                    Cancel
+                </a>
+                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                    Update Event
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
+
+<script>
+    // Define subcategories for each category
+    const subcategoriesMap = {
+        "Tech": ["Programming", "AI & Machine Learning", "Blockchain", "Startups", "Web Development", "Mobile Development", "Cloud Computing", "Data Science", "Cybersecurity"],
+        "Business": ["Networking", "Marketing", "Finance", "Entrepreneurship", "Leadership", "Management", "Sales", "Investment"],
+        "Arts": ["Visual Arts", "Theater", "Film", "Literature", "Photography", "Design", "Crafts", "Dance"],
+        "Community": ["Volunteering", "Environment", "Education", "Charity", "Activism", "Local Events", "Cultural"],
+        "Health": ["Fitness", "Yoga", "Mental Health", "Nutrition", "Meditation", "Wellness", "Healthcare"],
+        "Sports": ["Running", "Cycling", "Hiking", "Team Sports", "Water Sports", "Winter Sports", "Martial Arts", "Golf"],
+        "Food": ["Cooking", "Baking", "Wine Tasting", "Beer", "Dining", "Food Festivals", "Vegetarian/Vegan"],
+        "Education": ["Workshops", "Lectures", "Courses", "Conferences", "Research", "Languages", "Science"],
+        "Music": ["Live Music", "Concerts", "Festivals", "Classical", "Jazz", "Rock", "Electronic", "Hip Hop"]
+    };
+    
+    // Function to update subcategories dropdown
+    function updateSubcategories() {
+        const categorySelect = document.getElementById('category');
+        const subcategorySelect = document.getElementById('subcategory');
+        const currentSubcategory = subcategorySelect.getAttribute('data-current-subcategory');
+        
+        // Clear existing options
+        subcategorySelect.innerHTML = '';
+        
+        const selectedCategory = categorySelect.value;
+        
+        if (selectedCategory && subcategoriesMap[selectedCategory]) {
+            // Add placeholder option
+            const placeholderOption = document.createElement('option');
+            placeholderOption.value = '';
+            placeholderOption.textContent = 'Select a subcategory';
+            subcategorySelect.appendChild(placeholderOption);
+            
+            // Add subcategory options
+            subcategoriesMap[selectedCategory].forEach(subcategory => {
+                const option = document.createElement('option');
+                option.value = subcategory;
+                option.textContent = subcategory;
+                
+                // Select the current subcategory if it matches
+                if (currentSubcategory === subcategory) {
+                    option.selected = true;
+                }
+                
+                subcategorySelect.appendChild(option);
+            });
+        } else {
+            // Add default option if no category selected
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'Select a category first';
+            subcategorySelect.appendChild(option);
+        }
+    }
+    
+    // Initialize subcategories on page load
+    document.addEventListener('DOMContentLoaded', updateSubcategories);
+</script>
 {% endblock %}

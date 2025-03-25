@@ -1,191 +1,452 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="space-y-8">
+<div class="max-w-7xl mx-auto">
     <!-- Hero Section -->
-    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-8 text-white">
+    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-8 text-white mb-8">
         <div class="max-w-3xl mx-auto text-center space-y-4">
-            <h1 class="text-4xl font-bold">Discover Amazing Events</h1>
-            <p class="text-xl opacity-90">Find the perfect events happening around you</p>
+            <h1 class="text-4xl font-bold">Welcome, {{ current_user.username }}</h1>
+            <p class="text-xl opacity-90">Discover events tailored to your interests</p>
         </div>
     </div>
 
-    <!-- Events Grid -->
-    <div id="events-container" class="space-y-6">
-        <div class="flex justify-between items-center">
-            <h2 class="text-2xl font-bold text-gray-900">Upcoming Events</h2>
-            <div class="text-sm text-gray-500" id="events-count"></div>
-        </div>
-        
-        <!-- Loading State -->
-        <div id="loading-state" class="hidden">
-            <div class="flex justify-center items-center py-12">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+    <!-- Events Section -->
+    <div class="py-6 bg-gray-50 rounded-lg shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center">
+                <h2 class="text-3xl font-extrabold text-gray-900 sm:text-4xl">
+                    Events For You
+                </h2>
+                <p class="mt-3 max-w-2xl mx-auto text-xl text-gray-500 sm:mt-4">
+                    Discover events based on your interests and location
+                </p>
             </div>
-        </div>
 
-        <!-- Events Grid -->
-        <div id="events-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <!-- Events will be inserted here -->
-        </div>
+            <!-- Loading State -->
+            <div id="loading-events" class="hidden mt-12 text-center">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                <p class="mt-4 text-gray-500">Finding events for you...</p>
+            </div>
 
-        <!-- Empty State -->
-        <div id="empty-state" class="hidden">
-            <div class="text-center py-12">
-                <div class="text-gray-400 text-6xl mb-4">🔍</div>
-                <h3 class="text-lg font-medium text-gray-900">No events found</h3>
-                <p class="text-gray-500 mt-2">Try adjusting your filters</p>
+            <!-- Error State -->
+            <div id="events-error" class="hidden mt-12 text-center">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">Unable to load events</h3>
+                <p class="mt-1 text-sm text-gray-500" id="error-message">Enable Location</p>
+                <div id="location-instructions" class="mt-2 text-sm text-gray-500 hidden">
+                    <p>To enable location:</p>
+                    <ol class="text-left max-w-xs mx-auto mt-2 space-y-1">
+                        <li>1. Click the lock/info icon in your browser's address bar</li>
+                        <li>2. Find "Location" permission and set to "Allow"</li>
+                        <li>3. Refresh this page</li>
+                    </ol>
+                </div>
+                <div class="mt-4 flex flex-col sm:flex-row justify-center gap-2">
+                    <button onclick="requestLocationPermission()" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                        Allow Location Access
+                    </button>
+                    <button onclick="loadWithoutLocation()" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        Continue Without Location
+                    </button>
+                </div>
+            </div>
+
+            <!-- Events Grid -->
+            <div id="events-grid" class="mt-12 grid gap-6 lg:grid-cols-3 md:grid-cols-2 sm:grid-cols-1">
+            </div>
+
+            <!-- No Events State -->
+            <div id="no-events" class="hidden text-center mt-12">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No events found</h3>
+                <p class="mt-1 text-sm text-gray-500">
+                    No upcoming events found matching your interests.
+                </p>
+                <div class="mt-6 space-y-2">
+                    <div class="flex flex-wrap justify-center gap-2">
+                        <a href="{{ url_for('update_preferences') }}" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                            Update Preferences
+                        </a>
+                        <button onclick="tryDifferentInterests()" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            Try Different Search
+                        </button>
+                    </div>
+                    
+                    <!-- Interest quick-select options for popular categories -->
+                    <div id="interest-options" class="hidden mt-4 p-4 bg-white rounded-lg shadow border border-gray-200">
+                        <p class="text-sm font-medium text-gray-700 mb-3">Try one of these popular categories:</p>
+                        <div class="flex flex-wrap gap-2 justify-center">
+                            <button onclick="changeInterest('Music')" class="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-sm hover:bg-indigo-100">Music</button>
+                            <button onclick="changeInterest('Technology')" class="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-sm hover:bg-indigo-100">Technology</button>
+                            <button onclick="changeInterest('Food')" class="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-sm hover:bg-indigo-100">Food</button>
+                            <button onclick="changeInterest('Business')" class="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-sm hover:bg-indigo-100">Business</button>
+                            <button onclick="changeInterest('Sports')" class="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-sm hover:bg-indigo-100">Sports</button>
+                            <button onclick="changeInterest('Arts')" class="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-sm hover:bg-indigo-100">Arts</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-window.addEventListener('load', function() {
-    const filterButtons = document.querySelectorAll('.filter-btn');
-    let currentFilter = 'all';
+    class EventService {
+        constructor() {
+            this.userLocation = null;
+            this.defaultRadius = 50; // km
+            this.locationStatus = 'unknown'; // 'granted', 'denied', 'unknown'
+            this.userInterests = "{{ current_user.interests[0].subcategory if current_user.interests else '' }}";
+            this.permissionDeniedPermanently = false;
+        }
 
-    // Show loading state
-    function showLoading() {
-        document.getElementById('loading-state').classList.remove('hidden');
-        document.getElementById('events-grid').classList.add('hidden');
-        document.getElementById('empty-state').classList.add('hidden');
-    }
+        async initialize() {
+            document.getElementById('loading-events').classList.remove('hidden');
+            document.getElementById('events-error').classList.add('hidden');
+            document.getElementById('events-grid').innerHTML = '';
+            document.getElementById('no-events').classList.add('hidden');
+            document.getElementById('location-instructions').classList.add('hidden');
 
-    // Update events display
-    async function fetchEvents() {
-        showLoading();
+            try {
+                await this.getUserLocation();
+                if (this.locationStatus === 'granted') {
+                    await this.loadEvents();
+                } else {
+                    this.showLocationError();
+                }
+            } catch (error) {
+                console.error('Error initializing events:', error);
+                this.showError(error.message);
+            }
+        }
 
-        try {
-            // Get user's location if available
-            let params = new URLSearchParams({
-                category: currentFilter
-            });
+        showLocationError() {
+            const errorMessage = "Please enable location access to see events near you";
+            this.showError(errorMessage);
+            
+            // Show browser-specific instructions if permission was denied
+            if (this.permissionDeniedPermanently) {
+                document.getElementById('location-instructions').classList.remove('hidden');
+            }
+        }
 
-            if (navigator.geolocation) {
-                try {
-                    const position = await new Promise((resolve, reject) => {
-                        navigator.geolocation.getCurrentPosition(resolve, reject);
+        async getUserLocation() {
+            try {
+                // Check for permission status first
+                if (navigator.permissions && navigator.permissions.query) {
+                    const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+                    
+                    if (permissionStatus.state === 'denied') {
+                        this.locationStatus = 'denied';
+                        this.permissionDeniedPermanently = true;
+                        return;
+                    }
+                }
+                
+                const position = await new Promise((resolve, reject) => {
+                    if (!navigator.geolocation) {
+                        reject(new Error('Geolocation is not supported by your browser'));
+                        return;
+                    }
+                    
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        maximumAge: 600000, // 10 minutes
+                        timeout: 10000,     // 10 seconds
+                        enableHighAccuracy: true
                     });
-                    params.append('lat', position.coords.latitude);
-                    params.append('lng', position.coords.longitude);
-                } catch (err) {
-                    console.log('Location access denied or error:', err);
+                });
+
+                this.userLocation = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                
+                this.locationStatus = 'granted';
+                
+            } catch (error) {
+                console.warn('Location access denied or error:', error.message);
+                this.locationStatus = 'denied';
+                
+                // If error code is permission denied (1), mark as permanently denied
+                if (error.code === 1) {
+                    this.permissionDeniedPermanently = true;
                 }
             }
-
-            // Fetch events
-            const response = await fetch(`/api/events?${params}`);
-            if (!response.ok) throw new Error('Network response was not ok');
-            
-            const data = await response.json();
-            
-            // Update UI
-            document.getElementById('loading-state').classList.add('hidden');
-            const eventsGrid = document.getElementById('events-grid');
-            
-            if (data.events && data.events.length > 0) {
-                eventsGrid.classList.remove('hidden');
-                document.getElementById('empty-state').classList.add('hidden');
-                eventsGrid.innerHTML = data.events.map(event => createEventCard(event)).join('');
-                document.getElementById('events-count').textContent = `${data.events.length} events found`;
-            } else {
-                eventsGrid.classList.add('hidden');
-                document.getElementById('empty-state').classList.remove('hidden');
-                document.getElementById('events-count').textContent = '0 events found';
-            }
-        } catch (error) {
-            console.error('Error fetching events:', error);
-            document.getElementById('loading-state').classList.add('hidden');
-            document.getElementById('events-grid').innerHTML = `
-                <div class="col-span-full text-center py-12">
-                    <p class="text-red-600">Failed to load events. Please try again.</p>
-                </div>
-            `;
         }
-    }
 
-    // Create event card HTML
-    function createEventCard(event) {
-        const dateText = event.date?.when || event.date?.start_date || 'Date TBA';
-        const venue = event.venue || '';
-        const tickets = event.tickets || {};
-
-        return `
-            <div class="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-300">
-                <div class="h-48 bg-gray-100 relative">
-                    ${event.thumbnail ? 
-                        `<img src="${escapeHtml(event.thumbnail)}" 
-                            alt="${escapeHtml(event.title)}" 
-                            class="w-full h-full object-cover object-center">` :
-                        `<div class="flex items-center justify-center h-full">
-                            <span class="text-4xl">📸</span>
-                        </div>`
+        async loadEvents() {
+            try {
+                let url = '/api/events?';
+                
+                // Add user interests if available
+                if (this.userInterests) {
+                    url += `q=${encodeURIComponent(this.userInterests)}&`;
+                }
+                
+                // Add location if available
+                if (this.userLocation && this.userLocation.lat && this.userLocation.lng) {
+                    url += `lat=${this.userLocation.lat}&lng=${this.userLocation.lng}`;
+                } else if (this.locationStatus === 'denied') {
+                    // If location is denied, we'll still load events based on interests
+                    // or default location from user profile if available
+                    const userLocation = "{{ current_user.location or '' }}";
+                    if (userLocation) {
+                        url += `location=${encodeURIComponent(userLocation)}`;
                     }
-                </div>
-                <div class="p-6">
-                    <h3 class="font-semibold text-lg text-gray-900 mb-2">${escapeHtml(event.title)}</h3>
-                    <div class="space-y-3">
-                        <div class="flex items-center text-gray-600">
-                            <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <span class="text-sm">${escapeHtml(dateText)}</span>
-                        </div>
-                        ${venue ? `
-                            <div class="flex items-center text-gray-600">
-                                <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                          d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                </svg>
-                                <span class="text-sm">${escapeHtml(venue)}</span>
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
-                ${tickets.price || tickets.link ? `
-                    <div class="px-6 py-4 bg-gray-50 border-t border-gray-100">
+                }
+                
+                console.log('Fetching events from:', url);
+                document.getElementById('loading-events').classList.remove('hidden');
+                
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                
+                const events = data.events || [];
+                console.log(`Received ${events.length} events`);
+                
+                if (events.length === 0) {
+                    console.log('No events found, checking meta information');
+                    console.log('Events meta:', data.meta);
+                    
+                    // Show a more helpful message if we received no events
+                    if (data.meta && data.meta.location) {
+                        document.getElementById('no-events').querySelector('p').textContent = 
+                            `No upcoming events found for "${data.meta.query || 'your interests'}" in "${data.meta.location}".`;
+                    }
+                }
+                
+                // Render events (handles empty case too)
+                this.renderEvents(events);
+                
+                // Track impressions for recommendation system
+                if (events.length > 0) {
+                    this.trackImpressions(events);
+                }
+            } catch (error) {
+                console.error('Error loading events:', error);
+                this.showError('Could not load events. Please try again later.');
+            }
+        }
+
+        renderEvents(events) {
+            document.getElementById('loading-events').classList.add('hidden');
+            
+            if (!events || !Array.isArray(events) || events.length === 0) {
+                document.getElementById('no-events').classList.remove('hidden');
+                return;
+            }
+
+            const eventsGrid = document.getElementById('events-grid');
+            eventsGrid.innerHTML = events.map(event => this.createEventCard(event)).join('');
+        }
+
+        createEventCard(event) {
+            if (!event) return '';
+            
+            const title = event.title || 'Untitled Event';
+            const description = event.description || 'No description available';
+            const date = event.date || {};
+            const venue = event.venue || '';
+            const tickets = event.tickets || null;
+            
+            return `
+                <div class="flex flex-col bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
+                    ${event.thumbnail ? `
+                        <img src="${event.thumbnail}" alt="${this.escapeHtml(title)}" 
+                            class="w-full h-48 object-cover"
+                            onerror="this.src='/api/placeholder/400/200'; this.onerror=null;">
+                    ` : ''}
+                    <div class="flex-1 p-6">
                         <div class="flex items-center justify-between">
-                            <span class="text-sm font-medium text-gray-900">${escapeHtml(tickets.price || 'Tickets available')}</span>
-                            ${tickets.link ? `
-                                <a href="${escapeHtml(tickets.link)}" 
-                                   target="_blank" 
-                                   rel="noopener noreferrer"
-                                   class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
-                                    Get Tickets
-                                </a>
+                            <h3 class="text-xl font-semibold text-gray-900">${this.escapeHtml(title)}</h3>
+                            ${tickets && tickets.status ? `
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    ${this.escapeHtml(tickets.status)}
+                                </span>
+                            ` : ''}
+                        </div>
+                        <p class="mt-3 text-base text-gray-500">
+                            ${this.escapeHtml(description)}
+                        </p>
+                        <div class="mt-6 space-y-3">
+                            <div class="flex items-center text-gray-500">
+                                <svg class="flex-shrink-0 mr-1.5 h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/>
+                                </svg>
+                                <span>${this.escapeHtml(date.when || date.start_date || 'Date TBA')}</span>
+                            </div>
+                            ${venue ? `
+                                <div class="flex items-center text-gray-500">
+                                    <svg class="flex-shrink-0 mr-1.5 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                    </svg>
+                                    <span>${this.escapeHtml(venue)}</span>
+                                </div>
                             ` : ''}
                         </div>
                     </div>
-                ` : ''}
-            </div>
-        `;
+                    <div class="bg-gray-50 px-6 py-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-gray-900">${tickets ? this.escapeHtml(tickets.price || 'Tickets available') : ''}</span>
+                            <div class="flex space-x-2">
+                                ${event.link ? `
+                                    <a href="${event.link}" target="_blank" rel="noopener noreferrer" 
+                                       onclick="trackEventClick('${this.escapeHtml(title)}')"
+                                       class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                                        See Details
+                                    </a>
+                                ` : ''}
+                                ${tickets && tickets.link ? `
+                                    <a href="${tickets.link}" target="_blank" rel="noopener noreferrer" 
+                                       class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                                        Get Tickets
+                                    </a>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>      
+                </div>      
+            `;
+        }
+
+        showError(message) {
+            document.getElementById('loading-events').classList.add('hidden');
+            document.getElementById('events-grid').innerHTML = '';
+            document.getElementById('no-events').classList.add('hidden');
+            
+            const errorElement = document.getElementById('events-error');
+            errorElement.classList.remove('hidden');
+            document.getElementById('error-message').textContent = message;
+            console.log('Error message:', message);
+        }
+
+        escapeHtml(unsafe) {
+            if (typeof unsafe !== 'string') return '';
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+        
+        // Track impressions for the recommendation system
+        async trackImpressions(events) {
+            if (!events || events.length === 0) return;
+            
+            // We only track impressions if we have event IDs
+            const eventsWithIds = events.filter(event => event.id);
+            if (eventsWithIds.length === 0) return;
+            
+            try {
+                for (const event of eventsWithIds) {
+                    await fetch('/api/track_interaction', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            event_id: event.id,
+                            interaction_type: 'impression',
+                            metadata: { source: 'home_page' }
+                        })
+                    });
+                }
+            } catch (error) {
+                console.error('Error tracking impressions:', error);
+            }
+        }
     }
 
-    // Escape HTML
-    function escapeHtml(unsafe) {
-        if (typeof unsafe !== 'string') return '';
-        return unsafe
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
+    // Function to track event clicks
+    function trackEventClick(eventTitle) {
+        console.log(`User clicked on event: ${eventTitle}`);
+        // You can add additional tracking here if needed
     }
 
-    // Add click handlers to filter buttons
-    filterButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            filterButtons.forEach(btn => btn.classList.remove('bg-indigo-50', 'border-indigo-600'));
-            button.classList.add('bg-indigo-50', 'border-indigo-600');
-            currentFilter = button.dataset.filter;
-            fetchEvents();
+    // Global service instance for reuse
+    let eventService;
+    
+    function initializeEvents() {
+        eventService = new EventService();
+        eventService.initialize();
+    }
+    
+    // Function to explicitly request location permission
+    function requestLocationPermission() {
+        // Show loading state
+        document.getElementById('events-error').classList.add('hidden');
+        document.getElementById('loading-events').classList.remove('hidden');
+        
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                // Success callback
+                function(position) {
+                    // We got permission, initialize with location
+                    if (eventService) {
+                        eventService.userLocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        eventService.locationStatus = 'granted';
+                        eventService.loadEvents();
+                    } else {
+                        initializeEvents();
+                    }
+                },
+                // Error callback
+                function(error) {
+                    console.error('Error getting location:', error);
+                    document.getElementById('loading-events').classList.add('hidden');
+                    
+                    // If permission denied, show instructions
+                    if (error.code === 1) { // Permission denied
+                        const errorElement = document.getElementById('events-error');
+                        errorElement.classList.remove('hidden');
+                        document.getElementById('location-instructions').classList.remove('hidden');
+                    } else {
+                        // For other errors, try without location
+                        loadWithoutLocation();
+                    }
+                },
+                // Options
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        } else {
+            // Geolocation not supported
+            loadWithoutLocation();
+        }
+    }
+    
+    // Function to load events without location
+    function loadWithoutLocation() {
+        document.getElementById('events-error').classList.add('hidden');
+        document.getElementById('loading-events').classList.remove('hidden');
+        
+        if (!eventService) {
+            eventService = new EventService();
+        }
+        
+        // Set location status but leave coordinates null
+        eventService.locationStatus = 'denied';
+        eventService.loadEvents().catch(error => {
+            console.error('Error loading events without location:', error);
+            document.getElementById('loading-events').classList.add('hidden');
+            document.getElementById('events-error').classList.remove('hidden');
         });
-    });
+    }
 
-    // Initial load of events
-    fetchEvents();
-});
+    document.addEventListener('DOMContentLoaded', initializeEvents);
 </script>
 {% endblock %}

@@ -28,12 +28,6 @@
                             Leave Event
                         </button>
                     </form>
-                    <button type="button" id="addToCalendarBtn" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-900 hover:bg-indigo-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        <svg class="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2zm-7 5h5v5h-5v-5z"/>
-                        </svg>
-                        Add to Calendar
-                    </button>
                     {% else %}
                     <form action="{{ url_for('join_event', event_id=event.id) }}" method="POST">
                         <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-900 hover:bg-indigo-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
@@ -129,6 +123,64 @@
                     </div>
                 </div>
                 
+                <!-- Calendar Integration -->
+                {% if current_user.is_authenticated %}
+                <div class="mt-8 pt-6 border-t border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Calendar Integration</h3>
+                    
+                    {% if not current_user.calendar_sync_enabled or not current_user.google_calendar_token %}
+                    <!-- Not connected to Google Calendar -->
+                    <div class="mt-2 flex items-center">
+                        <span class="text-sm text-gray-500 mr-4">Connect to Google Calendar to add events</span>
+                        <a href="{{ url_for('connect_google_calendar') }}" 
+                        class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            <svg class="h-4 w-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 0C5.383 0 0 5.383 0 12s5.383 12 12 12 12-5.383 12-12S18.617 0 12 0zm4.5 16.5c0 .828-.672 1.5-1.5 1.5h-6c-.828 0-1.5-.672-1.5-1.5v-9c0-.828.672-1.5 1.5-1.5h6c.828 0 1.5.672 1.5 1.5v9zM16.5 9H12v3h4.5V9z"/>
+                            </svg>
+                            Connect Google Calendar
+                        </a>
+                    </div>
+                    {% else %}
+                    <!-- Connected to Google Calendar -->
+                    <div class="mt-2" id="calendar-controls" data-event-id="{{ event.id }}">
+                        {% if is_attending %}
+                            {% set attendee = get_attendee(current_user.id, event.id) %}
+                            {% if attendee and attendee.synced_to_calendar %}
+                            <!-- Already in calendar -->
+                            <div class="flex items-center">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mr-4">
+                                    <svg class="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                    </svg>
+                                    Added to Calendar
+                                </span>
+                                <button type="button" 
+                                    onclick="removeFromCalendar({{ event.id }})"
+                                    class="inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                    Remove from Calendar
+                                </button>
+                            </div>
+                            {% else %}
+                            <!-- Not in calendar yet -->
+                            <button type="button" 
+                                onclick="addToCalendar({{ event.id }})"
+                                class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                <svg class="h-4 w-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 0C5.383 0 0 5.383 0 12s5.383 12 12 12 12-5.383 12-12S18.617 0 12 0zm4.5 16.5c0 .828-.672 1.5-1.5 1.5h-6c-.828 0-1.5-.672-1.5-1.5v-9c0-.828.672-1.5 1.5-1.5h6c.828 0 1.5.672 1.5 1.5v9zM16.5 9H12v3h4.5V9z"/>
+                                </svg>
+                                Add to Google Calendar
+                            </button>
+                            {% endif %}
+                        {% else %}
+                            <div class="text-sm text-gray-500">
+                                You must join this event before adding it to your calendar.
+                            </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
                 <!-- Event stats -->
                 <div class="mt-8 pt-6 border-t border-gray-200">
                     <h3 class="text-sm font-semibold text-gray-900 mb-3">Event Stats</h3>
@@ -178,41 +230,6 @@
     </div>
 </div>
 
-<!-- Google Calendar Modal -->
-<div id="calendarModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 hidden">
-    <div class="bg-white rounded-lg max-w-md w-full p-6">
-        <div class="flex justify-between items-start mb-4">
-            <h3 class="text-lg font-medium text-gray-900">Add to Google Calendar</h3>
-            <button type="button" id="closeCalendarModal" class="bg-white rounded-md text-gray-400 hover:text-gray-500 focus:outline-none">
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-        </div>
-        
-        <p class="text-sm text-gray-500 mb-4">Would you like to add this event to your Google Calendar?</p>
-        
-        <div id="googleAuthContainer" class="mb-4">
-            <!-- Google Sign-In button will be inserted here -->
-            <button type="button" id="signInWithGoogle" class="inline-flex w-full justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                <svg class="h-5 w-5 mr-2" viewBox="0 0 24 24">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                </svg>
-                Sign in with Google
-            </button>
-        </div>
-        
-        <div id="calendarActionContainer" class="hidden">
-            <button type="button" id="addEventToCalendar" class="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                Add to My Calendar
-            </button>
-        </div>
-    </div>
-</div>
-
 <!-- Map Modal -->
 <div id="mapModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 hidden">
     <div class="bg-white rounded-lg max-w-3xl w-full p-6">
@@ -253,14 +270,92 @@
         });
     });
     
-    // Google Calendar Functionality
-    document.getElementById('addToCalendarBtn')?.addEventListener('click', function() {
-        document.getElementById('calendarModal').classList.remove('hidden');
-    });
+    // Calendar API Functions
+    function addToCalendar(eventId) {
+        // Show loading or disable button
+        const button = document.querySelector('#calendar-controls button');
+        if (button) {
+            button.disabled = true;
+            button.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Adding...';
+        }
+        
+        fetch(`/api/add_to_calendar/${eventId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Show success message
+                alert('Event added to your Google Calendar!');
+                // Reload the page to update calendar status
+                window.location.reload();
+            } else {
+                // Show error message
+                alert(`Error: ${data.error || 'Failed to add event to calendar'}`);
+                // Re-enable button
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = '<svg class="h-4 w-4 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.383 0 0 5.383 0 12s5.383 12 12 12 12-5.383 12-12S18.617 0 12 0zm4.5 16.5c0 .828-.672 1.5-1.5 1.5h-6c-.828 0-1.5-.672-1.5-1.5v-9c0-.828.672-1.5 1.5-1.5h6c.828 0 1.5.672 1.5 1.5v9zM16.5 9H12v3h4.5V9z"/></svg> Add to Google Calendar';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to add event to calendar. Please try again.');
+            // Re-enable button
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = '<svg class="h-4 w-4 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.383 0 0 5.383 0 12s5.383 12 12 12 12-5.383 12-12S18.617 0 12 0zm4.5 16.5c0 .828-.672 1.5-1.5 1.5h-6c-.828 0-1.5-.672-1.5-1.5v-9c0-.828.672-1.5 1.5-1.5h6c.828 0 1.5.672 1.5 1.5v9zM16.5 9H12v3h4.5V9z"/></svg> Add to Google Calendar';
+            }
+        });
+    }
     
-    document.getElementById('closeCalendarModal')?.addEventListener('click', function() {
-        document.getElementById('calendarModal').classList.add('hidden');
-    });
+    function removeFromCalendar(eventId) {
+        // Show loading or disable button
+        const button = document.querySelector('#calendar-controls button');
+        if (button) {
+            button.disabled = true;
+            button.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Removing...';
+        }
+        
+        fetch(`/api/remove_from_calendar/${eventId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Show success message
+                alert('Event removed from your Google Calendar!');
+                // Reload the page to update calendar status
+                window.location.reload();
+            } else {
+                // Show error message
+                alert(`Error: ${data.error || 'Failed to remove event from calendar'}`);
+                // Re-enable button
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = 'Remove from Calendar';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to remove event from calendar. Please try again.');
+            // Re-enable button
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = 'Remove from Calendar';
+            }
+        });
+    }
     
     // Map Functionality
     document.getElementById('openMapBtn')?.addEventListener('click', function() {
@@ -279,19 +374,6 @@
     
     document.getElementById('closeMapModal')?.addEventListener('click', function() {
         document.getElementById('mapModal').classList.add('hidden');
-    });
-    
-    // Simulate Google Sign-In and Calendar Integration
-    document.getElementById('signInWithGoogle')?.addEventListener('click', function() {
-        // In a real implementation, this would trigger the Google OAuth flow
-        document.getElementById('googleAuthContainer').classList.add('hidden');
-        document.getElementById('calendarActionContainer').classList.remove('hidden');
-    });
-    
-    document.getElementById('addEventToCalendar')?.addEventListener('click', function() {
-        // In a real implementation, this would use the Google Calendar API
-        alert('Event successfully added to your Google Calendar!');
-        document.getElementById('calendarModal').classList.add('hidden');
     });
 </script>
 {% endblock %}
