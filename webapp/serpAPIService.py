@@ -17,9 +17,16 @@ class EventService:
         search_query = []
         if query:
             search_query.append(query)
+        
+        # Handle location in query differently depending on format
         if location:
-            # Add "events in" to location to improve results
-            search_query.append(f"events in {location}")
+            # Check if location is coordinates (contains a comma)
+            if ',' in location and not any(c.isalpha() for c in location):
+                # For coordinate-based locations, don't add "events in" to the query
+                search_query.append("events")
+            else:
+                # For named locations, add "events in" to improve results
+                search_query.append(f"events in {location}")
         elif not query:
             # Default to "upcoming events" if no query or location
             search_query.append("upcoming events")
@@ -38,8 +45,13 @@ class EventService:
         }
         
         # Add location if specified (separate from query)
+        # For coordinate-based locations, we always want to include in both q and location
         if location:
-            params["location"] = location
+            # For coordinate locations, strip any spaces
+            if ',' in location and not any(c.isalpha() for c in location):
+                params["location"] = location.replace(" ", "")
+            else:
+                params["location"] = location
             
         # Add date parameter if specified
         if date_param:
@@ -54,7 +66,31 @@ class EventService:
             
             if "error" in results:
                 print(f"SerpAPI error: {results['error']}")
-                return []
+                
+                # If location error, try again without the location parameter
+                if "location parameter" in results["error"] and location:
+                    print("Location error detected, trying without location parameter")
+                    
+                    # Remove location parameter but keep it in the query
+                    params.pop("location", None)
+                    
+                    # Try search again
+                    search = GoogleSearch(params)
+                    results = search.get_dict()
+                    
+                    if "error" in results:
+                        print(f"Still got error: {results['error']}")
+                        return []
+                    
+                    if "events_results" not in results:
+                        print("No events_results in second attempt response")
+                        return []
+                        
+                    formatted_events = self._format_events(results["events_results"])
+                    print(f"Formatted {len(formatted_events)} events from second attempt")
+                    return formatted_events
+                else:
+                    return []
             
             if "events_results" not in results:
                 print("No events_results in response")

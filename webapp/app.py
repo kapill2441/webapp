@@ -5,6 +5,8 @@ import requests
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import os
+from webapp.recommendation_service import EnhancedRecommendationService
+from webapp.google_calender import GoogleCalendarService
 from webapp.serpAPIService import EventService
 import logging
 from flask import current_app
@@ -41,6 +43,17 @@ db.init_app(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
+
+# Add custom Jinja filters
+@app.template_filter('attr_list')
+def get_attr_list(obj):
+    """
+    Returns a list of available attributes/methods on an object.
+    Usage in template: {% if 'method_name' in object|attr_list %}
+    """
+    return dir(obj)
+
+
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
@@ -76,30 +89,9 @@ def index():
 @app.route('/home')
 @login_required
 def home():
-    # Initialize the event service with your API key
-    event_service = EventService(os.getenv('SERPAPI_KEY'))
-    
-    # Get events based on user interests if available
+    # Get user interests to pass to template
     user_interests = UserInterests.query.filter_by(user_id=current_user.id).all()
-    query = user_interests[0].subcategory if user_interests else None
-    
-    # Get initial events for the page
-    events = event_service.search_events(
-        query=query,
-        location=current_user.location,
-        page=1
-    )
-    
-    return render_template('home.html', events=events)
-
-
-@app.route('/browse_local_events')
-@login_required
-def browse_local_events():
-    # Get all events from the database (not from SerpAPI)
-    all_events = Event.query.filter_by(privacy='public').all()
-    return render_template('browse_local_events.html', events=all_events)
-
+    return render_template('home.html', current_user=current_user,user_interests=user_interests)    
 
 @app.route('/api/events')
 def api_events():
@@ -109,18 +101,20 @@ def api_events():
     # Get location parameters
     lat = request.args.get('lat', type=float)
     lng = request.args.get('lng', type=float)
+    location = request.args.get('location')  # Direct location string (city, address, etc.)
     
     # Debug log the coordinates
     app.logger.debug(f"Received coordinates: lat={lat}, lng={lng}")
+    app.logger.debug(f"Received location: {location}")
     
     # Get other filter parameters
     query = request.args.get('q')
     date = request.args.get('date')
     page = int(request.args.get('page', 1))
     
-    # If we have coordinates, convert to location string
-    location = None
-    if lat and lng:
+    # If we have coordinates, convert to location string (if no direct location was provided)
+    resolved_location = None
+    if lat and lng and not location:
         try:
             app.logger.debug(f"Attempting reverse geocoding for coordinates: {lat}, {lng}")
             response = requests.get(
@@ -130,35 +124,167 @@ def api_events():
             if response.status_code == 200:
                 data = response.json()
                 address = data.get('address', {})
-                # Try to get city, state, or country
-                location = address.get('city') or address.get('state') or address.get('country')
-                app.logger.debug(f"Reverse geocoded location: {location}")
+                
+                # Try to get location at different levels - from most specific to least
+                # Prefer city, state/province, or country to avoid too-specific locations
+                resolved_location = (
+                    address.get('city') or 
+                    address.get('county') or 
+                    address.get('state') or 
+                    address.get('country')
+                )
+                
+                # If all we got was a specific location (ward, neighborhood), use country instead
+                if not resolved_location and ('ward' in address or 'suburb' in address or 'neighbourhood' in address):
+                    resolved_location = address.get('country')
+                
+                app.logger.debug(f"Reverse geocoded location: {resolved_location}")
         except Exception as e:
             app.logger.error(f"Error in reverse geocoding: {e}")
     
-    # If location lookup failed, use a default radius around coordinates
-    if not location and lat and lng:
-        location = f"{lat},{lng}"
-        app.logger.debug(f"Using coordinate-based location: {location}")
+    # If reverse geocoding failed or returned something too specific, try coordinates
+    if not resolved_location and lat and lng:
+        # For SerpAPI, the format is typically "latitude,longitude"
+        resolved_location = f"{lat},{lng}"
+        app.logger.debug(f"Using coordinate-based location: {resolved_location}")
+    
+    # Use provided location if no coordinates or geocoding failed
+    final_location = location or resolved_location
+    
+    # If user is logged in and we still don't have location, use their profile location
+    if not final_location and current_user.is_authenticated and current_user.location:
+        final_location = current_user.location
+        app.logger.debug(f"Using user profile location: {final_location}")
+    
+    # Final fallback to a nearby major city if we still couldn't resolve location
+    if not final_location:
+        # Default to a major city that SerpAPI definitely supports
+        final_location = "Nairobi"  # Assuming this is in Kenya based on the coordinates
+        app.logger.debug(f"Using fallback location: {final_location}")
 
-    # Search for events using the EventService
-    events = event_service.search_events(
-        query=query,
-        location=location,
-        date=date,
-        page=page
-    )
+    # Try to search for events
+    events = []
+    try:
+        # Search for events using the EventService
+        events = event_service.search_events(
+            query=query,
+            location=final_location,
+            date=date,
+            page=page
+        )
+        
+        # If no events found and we have a specific location, try with a broader location
+        if not events and final_location and "," not in final_location and final_location != "Nairobi":
+            app.logger.debug(f"No events found with location '{final_location}', trying with broader location")
+            # Try with a broader location (country or major city)
+            if current_user.is_authenticated and current_user.location:
+                broader_location = current_user.location.split(',')[0]  # Take the first part of location
+                app.logger.debug(f"Trying with user's broader location: {broader_location}")
+                events = event_service.search_events(query=query, location=broader_location, date=date, page=page)
+            
+            # Final fallback to "Nairobi" if still no events
+            if not events:
+                app.logger.debug("Still no events, trying with Nairobi")
+                events = event_service.search_events(query=query, location="Nairobi", date=date, page=page)
+    except Exception as e:
+        app.logger.error(f"Error searching events: {e}")
+        # Return empty list in case of errors
     
     # Return JSON response
     return jsonify({
         'events': events,
         'meta': {
-            'location': location,
+            'location': final_location,
             'query': query,
             'date': date,
             'page': page
         }
     })
+    
+# Initialize Google Calendar service
+google_calendar_service = GoogleCalendarService()
+google_calendar_service.init_app(app)
+
+@app.route('/connect_google_calendar')
+@login_required
+def connect_google_calendar():
+    """Start the Google Calendar OAuth flow"""
+    auth_url = google_calendar_service.get_authorization_url(current_user.id)
+    return redirect(auth_url)
+
+@app.context_processor
+def utility_processor():
+    def get_attendee(user_id, event_id):
+        """Get an attendee record for a specific user and event"""
+        from webapp.models import EventAttendee
+        return EventAttendee.query.filter_by(
+            user_id=user_id, 
+            event_id=event_id
+        ).first()
+    
+    return {'get_attendee': get_attendee}
+
+# Update your Google Calendar callback route to match your REDIRECT_URI
+@app.route('/auth/google/callback')
+def google_auth_callback():
+    """Handle Google OAuth callback"""
+    success = google_calendar_service.handle_auth_callback()
+    
+    if success:
+        flash('Successfully connected to Google Calendar!', 'success')
+    else:
+        flash('Failed to connect to Google Calendar.', 'error')
+        
+    return redirect(url_for('joined_events'))
+
+@app.route('/api/add_to_calendar/<int:event_id>', methods=['POST'])
+@login_required
+def add_to_calendar(event_id):
+    """Add an event to the user's Google Calendar"""
+    event = Event.query.get_or_404(event_id)
+    
+    # Check if user is attending the event
+    is_attending = EventAttendee.query.filter_by(user_id=current_user.id, event_id=event_id).first()
+    if not is_attending:
+        return jsonify({'error': 'You must join this event before adding it to your calendar'}), 400
+    
+    # Check if user has connected Google Calendar
+    if not current_user.calendar_sync_enabled or not current_user.google_calendar_token:
+        return jsonify({'error': 'Please connect your Google Calendar first'}), 400
+    
+    # Add event to calendar
+    success, result = google_calendar_service.add_event_to_calendar(current_user, event)
+    
+    if success:
+        return jsonify({'success': True, 'message': 'Event added to your Google Calendar', 'calendar_event_id': result})
+    else:
+        return jsonify({'error': f'Failed to add event to calendar: {result}'}), 500
+
+@app.route('/api/remove_from_calendar/<int:event_id>', methods=['POST'])
+@login_required
+def remove_from_calendar(event_id):
+    """Remove an event from the user's Google Calendar"""
+    attendee = EventAttendee.query.filter_by(user_id=current_user.id, event_id=event_id).first()
+    
+    if not attendee or not attendee.synced_to_calendar or not attendee.calendar_event_id:
+        return jsonify({'error': 'Event not found in your calendar'}), 400
+    
+    # Remove from calendar
+    success, result = google_calendar_service.remove_event_from_calendar(
+        current_user, 
+        attendee.calendar_event_id
+    )
+    
+    if success:
+        # Update the attendee record
+        attendee.synced_to_calendar = False
+        attendee.calendar_event_id = None
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Event removed from your Google Calendar'})
+    else:
+        return jsonify({'error': f'Failed to remove event from calendar: {result}'}), 500
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -238,10 +364,12 @@ def select_interests():
     return render_template('select_interests.html')
 
 
+
 @app.route('/create_event', methods=['GET', 'POST'])
 @login_required
 def create_event():
     if request.method == 'POST':
+        # Create a new event with category and subcategory
         event = Event(
             title=request.form['title'],
             description=request.form['description'],
@@ -249,13 +377,30 @@ def create_event():
             date=datetime.strptime(request.form['date'], '%Y-%m-%d'),
             privacy=request.form['privacy'],
             organizer_id=current_user.id,
-            event_popularity=float(request.form['event_popularity'])
+            event_popularity=float(request.form['event_popularity']),
+            # Add category and subcategory
+            category=request.form['category'],
+            subcategory=request.form['subcategory'],
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
         )
         db.session.add(event)
         db.session.commit()
+        
+        # Track this as an interaction
+        interaction = UserEventInteraction(
+            user_id=current_user.id,
+            event_id=event.id,
+            interaction_type='create',
+            timestamp=datetime.utcnow()
+        )
+        db.session.add(interaction)
+        db.session.commit()
+        
         flash('Event created successfully')
         return redirect(url_for('my_events'))
     return render_template('create_event.html')
+
 
 @app.route('/edit_event/<int:event_id>', methods=['GET', 'POST'])
 @login_required
@@ -274,8 +419,23 @@ def edit_event(event_id):
         event.date = datetime.strptime(request.form['date'], '%Y-%m-%d')
         event.privacy = request.form['privacy']
         event.event_popularity = float(request.form['event_popularity'])
+        # Update category and subcategory
+        event.category = request.form['category']
+        event.subcategory = request.form['subcategory']
+        event.updated_at = datetime.utcnow()
         
         db.session.commit()
+        
+        # Track this as an interaction
+        interaction = UserEventInteraction(
+            user_id=current_user.id,
+            event_id=event.id,
+            interaction_type='edit',
+            timestamp=datetime.utcnow()
+        )
+        db.session.add(interaction)
+        db.session.commit()
+        
         flash('Event updated successfully')
         return redirect(url_for('my_events'))
     
@@ -367,296 +527,12 @@ def joined_events():
     
     return render_template('joined_events.html', events=joined_events)
 
-
-class RecommendationService:
-    def __init__(self, api_url):
-        self.api_url = api_url
-        self.min_recommendations = 10
-        print(f"Initializing RecommendationService with API URL: {api_url}")
-        
-        # Test API connectivity
-        try:
-            response = requests.get(f"{api_url}/health", timeout=2)
-            if response.status_code == 200:
-                print("API connection successful!")
-            else:
-                print(f"API connection test failed with status: {response.status_code}")
-        except requests.RequestException as e:
-            print(f"API connection test failed: {e}")
-
-    def _safe_get_day_difference(self, event):
-        """Safely calculate days until event, handling None dates"""
-        if event.date is None:
-            # Default to 30 days in the future if no date
-            return 30
-        
-        try:
-            return (event.date - datetime.utcnow()).days
-        except Exception as e:
-            print(f"Error calculating days difference: {e}")
-            return 30  # Default fallback
-    
-    def get_user_interests(self, user_id):
-        """Get user interests from database"""
-        interests = []
-        user_interests = UserInterests.query.filter_by(user_id=user_id).all()
-        
-        for interest in user_interests:
-            interests.append({
-                'category': interest.category,
-                'subcategory': interest.subcategory,
-                'strength': interest.strength
-            })
-            
-        return interests
-
-    def get_recommendations(self, user, events):
-        """
-        Get personalized event recommendations
-        Uses AI model with better error handling
-        """
-        # Prepare user data with default values for missing fields
-        user_data = {
-            'birthyear': user.birthyear or 1990,
-            'gender': user.gender or 'unknown',
-            'locale': user.locale or 'unknown',
-            'location': user.location or 'unknown',
-            'timezone': user.timezone or 0,
-            'joinedAt': user.joinedAt.isoformat() if user.joinedAt else datetime.utcnow().isoformat(),
-            'latitude': user.latitude,
-            'longitude': user.longitude,
-            'precise_location_enabled': user.precise_location_enabled
-        }
-
-        # Get user interests
-        user_interests = self.get_user_interests(user.id)
-
-        # Get user interactions for learning
-        user_interactions = self._get_user_interactions(user.id)
-
-        # Prepare event data ensuring all required fields are present
-        events_data = []
-        for event in events:
-            try:
-                # Calculate distance from user if location data available
-                distance = None
-                if user.latitude and user.longitude and event.latitude and event.longitude:
-                    distance = self._calculate_distance(
-                        user.latitude, user.longitude,
-                        event.latitude, event.longitude
-                    )
-                
-                # Safely get day difference
-                days_until_event = self._safe_get_day_difference(event)
-                
-                event_dict = {
-                    'id': event.id,
-                    'title': event.title,
-                    'description': event.description or '',
-                    'location': event.location,
-                    'latitude': event.latitude,
-                    'longitude': event.longitude,
-                    'date': event.date.isoformat() if event.date else (datetime.utcnow() + timedelta(days=30)).isoformat(),
-                    'privacy': event.privacy or 'public',
-                    'category': event.category or 'unknown',
-                    'subcategory': event.subcategory or 'unknown',
-                    'event_popularity': float(event.event_popularity if event.event_popularity is not None else 0.5),
-                    'invited': 0,  # Adding default value for invited field
-                    'attendee_count': event.get_attendee_count(),  # Add attendee count
-                    'days_until_event': days_until_event,
-                    'distance_km': distance,
-                    'is_trending': getattr(event, 'calculate_trending_score', lambda: 50)() > 70,
-                    'created_at': event.created_at.isoformat() if event.created_at else datetime.utcnow().isoformat()
-                }
-                events_data.append(event_dict)
-            except Exception as e:
-                print(f"Error preparing event data for event {event.id}: {e}")
-                # Skip this event rather than failing the entire request
-                continue
-
-        # Prepare request data
-        request_data = {
-            'user': {'id': user.id},
-            'events': events_data,
-            'user_data': user_data,
-            'user_interests': user_interests,
-            'user_interactions': user_interactions
-        }
-
-        try:
-            # Log the request for debugging
-            print(f"Sending request to AI API: {self.api_url}")
-            
-            # Make API request with increased timeout
-            response = requests.post(
-                f"{self.api_url}/api/recommendations",
-                json=request_data,
-                headers={'Content-Type': 'application/json'},
-                timeout=10  # Increased timeout
-            )
-            
-            if response.status_code == 200:
-                # Get the recommendations from the API response
-                api_recommendations = response.json().get('recommendations', [])
-                
-                # Process the recommendations to match the expected format in the webapp
-                processed_recommendations = []
-                for rec in api_recommendations:
-                    processed_recommendations.append({
-                        'event_id': rec.get('event_id'),
-                        'score': rec.get('score'),
-                        'title': rec.get('title', '')
-                    })
-                    
-                return processed_recommendations
-            else:
-                print(f"API Error Response ({response.status_code}): {response.text}")
-                return []  # Return empty list on error
-        except requests.RequestException as e:
-            print(f"Request error getting recommendations: {e}")
-            return []  # Return empty list on error
-        except Exception as e:
-            print(f"Error getting recommendations: {e}")
-            return []  # Return empty list on error
-    
-    def _get_user_interactions(self, user_id):
-        """Get recent user interactions for recommendation learning"""
-        interactions = UserEventInteraction.query.filter_by(user_id=user_id).order_by(
-            UserEventInteraction.timestamp.desc()
-        ).limit(100).all()
-        
-        return [
-            {
-                'event_id': interaction.event_id,
-                'interaction_type': interaction.interaction_type,
-                'timestamp': interaction.timestamp.isoformat()
-            }
-            for interaction in interactions
-        ]
-    
-    def _calculate_distance(self, lat1, lon1, lat2, lon2):
-        """Calculate distance between two points in kilometers using Haversine formula"""
-        # Radius of earth in kilometers
-        R = 6371.0
-        
-        # Convert latitude and longitude from degrees to radians
-        lat1_rad = math.radians(lat1)
-        lon1_rad = math.radians(lon1)
-        lat2_rad = math.radians(lat2)
-        lon2_rad = math.radians(lon2)
-        
-        # Difference in coordinates
-        dlon = lon2_rad - lon1_rad
-        dlat = lat2_rad - lat1_rad
-        
-        # Haversine formula
-        a = math.sin(dlat / 2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon / 2)**2
-        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-        distance = R * c
-        
-        return distance
-    
-    def _generate_fallback_recommendations(self, user, events, user_interests, count=None):
-        """
-        Generate fallback recommendations based on user interests and event attributes
-        This is used when the AI API is unavailable or returns insufficient recommendations
-        """
-        app.logger.info("Generating fallback recommendations")
-        
-        # Create a mapping of user interests for quick lookup
-        user_interest_map = {}
-        for interest in user_interests:
-            category = interest['category'].lower()
-            subcategory = interest['subcategory'].lower()
-            
-            if category not in user_interest_map:
-                user_interest_map[category] = set()
-            
-            user_interest_map[category].add(subcategory)
-        
-        # Score each event
-        scored_events = []
-        for event in events:
-            score = self._calculate_event_score(event, user, user_interest_map)
-            scored_events.append({
-                'event': {
-                    'id': event.id,
-                    'title': event.title,
-                    'description': event.description,
-                    'location': event.location,
-                    'date': event.date.isoformat() if event.date else None,
-                    'privacy': event.privacy,
-                    'category': event.category,
-                    'subcategory': event.subcategory,
-                    'event_popularity': event.event_popularity,
-                    'attendee_count': event.get_attendee_count()
-                },
-                'score': score
-            })
-        
-        # Sort by score (highest first)
-        scored_events.sort(key=lambda x: x['score'], reverse=True)
-        
-        # Limit results if count specified
-        if count is not None:
-            scored_events = scored_events[:count]
-            
-        return scored_events
-    
-    def _calculate_event_score(self, event, user, user_interest_map):
-        """Calculate a recommendation score for an event based on user preferences"""
-        score = 0.5  # Base score
-        
-        # Category and subcategory matching
-        if event.category and event.subcategory:
-            category_lower = event.category.lower()
-            subcategory_lower = event.subcategory.lower()
-            
-            # Direct matches
-            if category_lower in user_interest_map:
-                score += 0.15  # Category match
-                
-                if subcategory_lower in user_interest_map[category_lower]:
-                    score += 0.25  # Subcategory match (more specific)
-        
-        # Event popularity factor
-        if event.event_popularity:
-            score += event.event_popularity * 0.15
-            
-        # Recency factor - prefer newer events
-        if event.created_at:
-            days_old = (datetime.utcnow() - event.created_at).days
-            recency_score = max(0, 0.1 - (days_old / 100) * 0.1)  # Up to 0.1 points for new events
-            score += recency_score
-            
-        # Date proximity factor - prefer events coming soon (but not too soon)
-        days_until = event.get_day_difference()
-        if days_until > 0:  # Future event
-            if days_until <= 7:  # Within a week
-                score += 0.1
-            elif days_until <= 30:  # Within a month
-                score += 0.05
-        
-        # Location factor - prioritize events in the user's location
-        if user.location and event.location and user.location.lower() in event.location.lower():
-            score += 0.1
-            
-        # Distance factor - if we have precise coordinates
-        if hasattr(event, 'distance_km') and event.distance_km is not None:
-            if event.distance_km < 5:  # Very close
-                score += 0.15
-            elif event.distance_km < 20:  # Reasonably close
-                score += 0.1
-            elif event.distance_km < 50:  # Somewhat close
-                score += 0.05
-        
-        # Cap the score at 1.0
-        return min(1.0, score)
-            
+          
 # Initialize recommendation service
 ai_api = os.getenv("AI_API")
-recommendation_service = RecommendationService(ai_api)
+recommendation_service = EnhancedRecommendationService(ai_api)
 
+# Update the recommendations route
 @app.route('/recommendations')
 @login_required
 def recommendations():
@@ -668,7 +544,7 @@ def recommendations():
             flash('No public events available for recommendations.')
             return redirect(url_for('home'))
 
-        # Get recommendations from API
+        # Get recommendations from enhanced service
         recommendations = recommendation_service.get_recommendations(
             current_user,
             public_events
@@ -677,14 +553,9 @@ def recommendations():
         # Process recommendations for template
         recommended_events = []
         for rec in recommendations:
-            # Check the response structure - the API now returns event_id directly
-            event_id = rec.get('event_id')
-            if event_id is None:
-                continue  # Skip this recommendation if event_id is missing
-                
-            event = db.session.get(Event, event_id)
-            if event:
-                recommended_events.append((event, rec['score']))
+            event = rec['event']
+            score = rec['score']
+            recommended_events.append((event, score))
 
         return render_template(
             'recommendations.html',
@@ -696,6 +567,47 @@ def recommendations():
         flash('Error generating recommendations. Please try again later.', 'error')
         return redirect(url_for('index'))
 
+@app.route('/update_preferences', methods=['GET', 'POST'])
+@login_required
+def update_preferences():
+    """Update user preferences/interests after registration"""
+    if request.method == 'POST':
+        # Clear existing interests
+        UserInterests.query.filter_by(user_id=current_user.id).delete()
+        
+        # Get selected interests from form
+        interests = request.form.getlist('interests[]')
+        
+        # Save new interests
+        for interest in interests:
+            try:
+                category, subcategory = interest.split(':', 1)
+                new_interest = UserInterests(
+                    user_id=current_user.id,
+                    category=category,
+                    subcategory=subcategory,
+                    strength=1.0,  # Default strength
+                    created_at=datetime.now()
+                )
+                db.session.add(new_interest)
+            except ValueError:
+                # Skip interests that don't have the correct format
+                app.logger.warning(f"Skipping invalid interest format: {interest}")
+                continue
+        
+        db.session.commit()
+        flash('Your preferences have been updated successfully!', 'success')
+        return redirect(url_for('recommendations'))
+    
+    # GET request - show the form
+    # Get current user interests for pre-filling the form
+    user_interests = []
+    interests = UserInterests.query.filter_by(user_id=current_user.id).all()
+    
+    for interest in interests:
+        user_interests.append(f"{interest.category}:{interest.subcategory}")
+    
+    return render_template('update_preferences.html', user_interests=user_interests)
 
 
 @app.route('/api/track_interaction', methods=['POST'])
@@ -893,8 +805,9 @@ def sync_calendar():
         return jsonify({'error': str(e)}), 500
 
 
-from webapp.commands import seed_db_command
+from webapp.commands import seed_db_command,update_event_categories_command
 app.cli.add_command(seed_db_command)
+app.cli.add_command(update_event_categories_command)
 if __name__ == '__main__':
     required_env_vars = ['SERPAPI_KEY', 'SECRET_KEY', 'DATABASE_URL', 'AI_API']
     missing_vars = [var for var in required_env_vars if not os.getenv(var)]

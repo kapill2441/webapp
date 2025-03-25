@@ -48,6 +48,151 @@ LOCALE_VALUES = ['en_US', 'en_GB', 'es_ES', 'fr_FR', 'de_DE', 'it_IT', 'ja_JP', 
 # Common timezone values
 TIMEZONE_VALUES = [-8, -7, -6, -5, -4, 0, 1, 2]
 
+
+import click
+from flask.cli import with_appcontext
+from webapp.models import db, Event, User, UserInterests, EventAttendee
+import re
+from datetime import datetime, timedelta
+import random
+
+# Add this to your existing commands.py file
+
+@click.command('update-event-categories')
+@with_appcontext
+def update_event_categories_command():
+    """Update existing events with categories based on their title and description."""
+    # Common keywords that might indicate categories
+    CATEGORY_KEYWORDS = {
+        'Tech': ['technology', 'tech', 'coding', 'programming', 'developers', 'software', 'hardware', 'ai', 'machine learning', 'data', 'computer', 'digital', 'cyber', 'cloud', 'blockchain', 'hackathon'],
+        'Business': ['business', 'entrepreneur', 'startup', 'finance', 'marketing', 'leadership', 'management', 'networking', 'career', 'investment', 'funding', 'venture', 'corporate'],
+        'Arts': ['art', 'museum', 'gallery', 'exhibition', 'creative', 'design', 'photography', 'film', 'movie', 'theater', 'theatre', 'dance', 'painting', 'sculpture', 'drawing', 'literature', 'poetry', 'writing'],
+        'Community': ['community', 'volunteer', 'charity', 'nonprofit', 'social', 'activism', 'environment', 'sustainability', 'local', 'neighborhood'],
+        'Health': ['health', 'wellness', 'fitness', 'yoga', 'meditation', 'mindfulness', 'nutrition', 'diet', 'mental health', 'healthcare', 'medical'],
+        'Sports': ['sport', 'athletic', 'running', 'marathon', 'cycling', 'swimming', 'hiking', 'climbing', 'football', 'soccer', 'basketball', 'baseball', 'tennis', 'golf'],
+        'Food': ['food', 'cooking', 'cuisine', 'culinary', 'chef', 'restaurant', 'dining', 'baking', 'wine', 'beer', 'cocktail', 'tasting', 'gastronomy'],
+        'Education': ['education', 'learning', 'school', 'academic', 'university', 'college', 'lecture', 'workshop', 'seminar', 'conference', 'training', 'course', 'class'],
+        'Music': ['music', 'concert', 'festival', 'band', 'musician', 'singer', 'performer', 'dj', 'jazz', 'rock', 'classical', 'hip hop', 'rap', 'electronic']
+    }
+
+    # Subcategory mappings (short version)
+    SUBCATEGORY_MAPPINGS = {
+        'Tech': {
+            'ai': 'AI & Machine Learning',
+            'machine learning': 'AI & Machine Learning',
+            'blockchain': 'Blockchain',
+            'programming': 'Programming',
+            'web': 'Web Development',
+            'mobile': 'Mobile Development',
+            'startup': 'Startups',
+            'cloud': 'Cloud Computing',
+            'data': 'Data Science',
+            'security': 'Cybersecurity'
+        },
+        'Business': {
+            'network': 'Networking',
+            'market': 'Marketing',
+            'finance': 'Finance',
+            'lead': 'Leadership',
+            'startup': 'Entrepreneurship'
+        },
+        'Arts': {
+            'visual': 'Visual Arts',
+            'paint': 'Visual Arts',
+            'theater': 'Theater',
+            'film': 'Film',
+            'movie': 'Film', 
+            'literature': 'Literature',
+            'book': 'Literature'
+        }
+    }
+
+    # Default subcategories for each category
+    DEFAULT_SUBCATEGORIES = {
+        'Tech': 'Programming',
+        'Business': 'Networking',
+        'Arts': 'Visual Arts',
+        'Community': 'Volunteering',
+        'Health': 'Fitness',
+        'Sports': 'Team Sports',
+        'Food': 'Dining',
+        'Education': 'Workshops',
+        'Music': 'Live Music'
+    }
+
+    def guess_category(event):
+        """Guess the category of an event based on its title and description"""
+        if not event.title and not event.description:
+            return None, None
+        
+        text = (event.title + ' ' + (event.description or '')).lower()
+        
+        # Check for category matches
+        category_scores = {}
+        for category, keywords in CATEGORY_KEYWORDS.items():
+            score = 0
+            for keyword in keywords:
+                pattern = r'\b' + re.escape(keyword) + r'\b'
+                matches = re.findall(pattern, text)
+                score += len(matches)
+            if score > 0:
+                category_scores[category] = score
+        
+        if not category_scores:
+            return None, None
+        
+        # Get category with highest score
+        best_category = max(category_scores.items(), key=lambda x: x[1])[0]
+        
+        # Try to find a subcategory
+        subcategory = None
+        if best_category in SUBCATEGORY_MAPPINGS:
+            for key, value in SUBCATEGORY_MAPPINGS[best_category].items():
+                if key in text:
+                    subcategory = value
+                    break
+        
+        # Use default subcategory if none found
+        if not subcategory and best_category in DEFAULT_SUBCATEGORIES:
+            subcategory = DEFAULT_SUBCATEGORIES[best_category]
+        
+        return best_category, subcategory
+
+    # Get all events without categories
+    events = Event.query.filter(
+        (Event.category.is_(None)) | 
+        (Event.category == '') |
+        (Event.subcategory.is_(None)) | 
+        (Event.subcategory == '')
+    ).all()
+    
+    click.echo(f"Found {len(events)} events without complete category information")
+    
+    updated_count = 0
+    for event in events:
+        category, subcategory = guess_category(event)
+        
+        if category:
+            click.echo(f"Event '{event.title}': {category} - {subcategory or 'Unknown subcategory'}")
+            event.category = category
+            if subcategory:
+                event.subcategory = subcategory
+            else:
+                # Set a default subcategory if none was found
+                event.subcategory = "General"
+            
+            # Update timestamps if missing
+            if not event.created_at:
+                event.created_at = datetime.utcnow() - timedelta(days=random.randint(1, 30))
+            if not event.updated_at:
+                event.updated_at = datetime.utcnow()
+                
+            updated_count += 1
+    
+    db.session.commit()
+    click.echo(f"Updated {updated_count} events with categories")
+    
+    
 @click.command('seed-db')
 @click.option('--users', default=50, help='Number of users to create')
 @click.option('--events', default=20, help='Number of events to create')
