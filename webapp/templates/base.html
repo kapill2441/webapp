@@ -43,6 +43,7 @@
                         <a href="{{ url_for('my_events') }}" class="text-gray-500 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">My Events</a>
                         <a href="{{ url_for('joined_events') }}" class="text-gray-500 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Joined Events</a>
                         <a href="{{ url_for('recommendations') }}" class="text-gray-500 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Recommendations</a>
+                        <a href="{{ url_for('browse_local_events') }}" class="text-gray-500 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Browse Joinable Events</a>
                         <a href="{{ url_for('update_preferences') }}" class="text-gray-500 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">My Preferences</a>
                         <a href="{{ url_for('logout') }}" class="text-gray-500 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Logout</a>
                         {% else %}
@@ -63,6 +64,7 @@
                 <a href="{{ url_for('my_events') }}" class="text-gray-500 hover:text-indigo-600 block px-3 py-2 text-base font-medium">My Events</a>
                 <a href="{{ url_for('joined_events') }}" class="text-gray-500 hover:text-indigo-600 block px-3 py-2 text-base font-medium">Joined Events</a>
                 <a href="{{ url_for('recommendations') }}" class="text-gray-500 hover:text-indigo-600 block px-3 py-2 text-base font-medium">Recommendations</a>
+                <a href="{{ url_for('browse_local_events') }}" class="text-gray-500 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Browse Joinable Events</a>
                 <a href="{{ url_for('logout') }}" class="text-gray-500 hover:text-indigo-600 block px-3 py-2 text-base font-medium">Logout</a>
                 <a href="{{ url_for('update_preferences') }}" class="text-gray-500 hover:text-indigo-600 block px-3 py-2 text-base font-medium">My Preferences</a>
                 {% else %}

@@ -6,7 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import os
 from webapp.recommendation_service import EnhancedRecommendationService
-from webapp.google_calender import GoogleCalendarService
+from webapp.google_calendar import GoogleCalendarService
 from webapp.serpAPIService import EventService
 import logging
 from flask import current_app
@@ -223,6 +223,14 @@ def utility_processor():
         ).first()
     
     return {'get_attendee': get_attendee}
+
+
+@app.route('/browse_local_events')
+@login_required
+def browse_local_events():
+    # Get all events from the database (not from SerpAPI)
+    all_events = Event.query.filter_by(privacy='public').all()
+    return render_template('browse_local_events.html', events=all_events)
 
 # Update your Google Calendar callback route to match your REDIRECT_URI
 @app.route('/auth/google/callback')

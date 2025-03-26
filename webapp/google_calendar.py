@@ -1,4 +1,3 @@
-# webapp/google_calendar.py
 import os
 from flask import redirect, request, url_for, session, current_app, flash
 from google_auth_oauthlib.flow import Flow
@@ -139,9 +138,30 @@ class GoogleCalendarService:
         # Build the Calendar API service
         service = build('calendar', 'v3', credentials=credentials)
         
-        # Convert event date to RFC3339 format
+        # Validate event date
         start_datetime = event.date
-        end_datetime = event.end_date if event.end_date else (start_datetime + timedelta(hours=2))
+        if not start_datetime:
+            return False, "Event has no start date"
+        
+        # Make sure start_datetime has time component
+        if isinstance(start_datetime, datetime) and start_datetime.hour == 0 and start_datetime.minute == 0 and start_datetime.second == 0:
+            # If it's midnight exactly, it might be just a date without time
+            # Set a default time like 9:00 AM
+            start_datetime = datetime.combine(start_datetime.date(), datetime.min.time()) + timedelta(hours=9)
+        
+        # Calculate end_datetime - ensure it's at least 30 minutes after start
+        if event.end_date and event.end_date > start_datetime:
+            end_datetime = event.end_date
+        else:
+            # Default to 2 hours after start
+            end_datetime = start_datetime + timedelta(hours=2)
+        
+        # Ensure times are different by at least some amount
+        if end_datetime <= start_datetime:
+            end_datetime = start_datetime + timedelta(minutes=30)
+        
+        # Log the date values for debugging
+        current_app.logger.debug(f"Event dates: start={start_datetime}, end={end_datetime}")
         
         # Create calendar event
         calendar_event = {
