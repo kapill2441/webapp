@@ -34,6 +34,38 @@
                 id="date" name="date" required>
         </div>
         
+        <!-- Category field -->
+        <div>
+          <label for="category" class="block text-sm font-medium text-gray-700">Category</label>
+          <select class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
+                  id="category" name="category" required>
+            <option value="">Select a category</option>
+            <option value="Music">Music</option>
+            <option value="Technology">Technology</option>
+            <option value="Food">Food</option>
+            <option value="Arts">Arts</option>
+            <option value="Sports">Sports</option>
+            <option value="Education">Education</option>
+            <option value="Business">Business</option>
+            <option value="Health & Wellness">Health & Wellness</option>
+            <option value="Science & Exploration">Science & Exploration</option>
+            <option value="Travel & Adventure">Travel & Adventure</option>
+            <option value="Social & Lifestyle">Social & Lifestyle</option>
+            <option value="Environmental & Sustainability">Environmental & Sustainability</option>
+            <option value="Finance & Investing">Finance & Investing</option>
+            <option value="Fashion & Beauty">Fashion & Beauty</option>
+            <option value="Outdoor">Outdoor</option>
+          </select>
+        </div>
+        
+        <!-- Subcategory field -->
+        <div>
+          <label for="subcategory" class="block text-sm font-medium text-gray-700">Subcategory</label>
+          <input type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
+                id="subcategory" name="subcategory" placeholder="e.g. Jazz, Hiking, AI & Machine Learning" required>
+          <p class="mt-1 text-sm text-gray-500">Enter a more specific type for your event.</p>
+        </div>
+        
         <div>
           <label for="privacy" class="block text-sm font-medium text-gray-700">Privacy</label>
           <select class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
