@@ -357,19 +357,30 @@ def select_interests():
         
         # Save new interests
         for interest in interests:
-            category, subcategory = interest.split(':', 1)
-            new_interest = UserInterests(
-                user_id=current_user.id,
-                category=category,
-                subcategory=subcategory
-            )
-            db.session.add(new_interest)
+            try:
+                category, subcategory = interest.split(':', 1)
+                new_interest = UserInterests(
+                    user_id=current_user.id,
+                    category=category,
+                    subcategory=subcategory,
+                    strength=1.0,  # Default strength
+                    created_at=datetime.now()
+                )
+                db.session.add(new_interest)
+            except ValueError:
+                # Skip interests that don't have the correct format
+                app.logger.warning(f"Skipping invalid interest format: {interest}")
+                continue
         
         db.session.commit()
-        flash('Interests updated successfully!')
+        flash('Interests updated successfully!', 'success')
         return redirect(url_for('recommendations'))
-        
-    return render_template('select_interests.html')
+    
+    # GET request - show the form
+    # For new users, there won't be any interests yet
+    user_interests = []
+    
+    return render_template('select_interests.html', user_interests=user_interests)
 
 
 
@@ -535,7 +546,37 @@ def joined_events():
     
     return render_template('joined_events.html', events=joined_events)
 
-          
+
+@app.route('/delete_event/<int:event_id>', methods=['POST'])
+@login_required
+def delete_event(event_id):
+    event = Event.query.get_or_404(event_id)
+    
+    # Ensure only the organizer can delete the event
+    if event.organizer_id != current_user.id:
+        flash('You do not have permission to delete this event.', 'error')
+        return redirect(url_for('my_events'))
+    
+    try:
+        # First, delete all attendee records for this event
+        EventAttendee.query.filter_by(event_id=event_id).delete()
+        
+        # Delete all user interactions related to this event
+        UserEventInteraction.query.filter_by(event_id=event_id).delete()
+        
+        # Finally, delete the event itself
+        db.session.delete(event)
+        db.session.commit()
+        
+        flash('Event successfully deleted.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error deleting event: {str(e)}")
+        flash('An error occurred while deleting the event.', 'error')
+    
+    return redirect(url_for('my_events'))
+
+     
 # Initialize recommendation service
 ai_api = os.getenv("AI_API")
 recommendation_service = EnhancedRecommendationService(ai_api)

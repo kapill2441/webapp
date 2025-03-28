@@ -1,3 +1,4 @@
+<!-- templates/create_event.html -->
 {% extends 'base.html' %}
 
 {% block title %}Create Event{% endblock %}
@@ -35,35 +36,32 @@
         </div>
         
         <!-- Category field -->
-        <div>
-          <label for="category" class="block text-sm font-medium text-gray-700">Category</label>
-          <select class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                  id="category" name="category" required>
-            <option value="">Select a category</option>
-            <option value="Music">Music</option>
-            <option value="Technology">Technology</option>
-            <option value="Food">Food</option>
-            <option value="Arts">Arts</option>
-            <option value="Sports">Sports</option>
-            <option value="Education">Education</option>
-            <option value="Business">Business</option>
-            <option value="Health & Wellness">Health & Wellness</option>
-            <option value="Science & Exploration">Science & Exploration</option>
-            <option value="Travel & Adventure">Travel & Adventure</option>
-            <option value="Social & Lifestyle">Social & Lifestyle</option>
-            <option value="Environmental & Sustainability">Environmental & Sustainability</option>
-            <option value="Finance & Investing">Finance & Investing</option>
-            <option value="Fashion & Beauty">Fashion & Beauty</option>
-            <option value="Outdoor">Outdoor</option>
-          </select>
-        </div>
-        
-        <!-- Subcategory field -->
-        <div>
-          <label for="subcategory" class="block text-sm font-medium text-gray-700">Subcategory</label>
-          <input type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                id="subcategory" name="subcategory" placeholder="e.g. Jazz, Hiking, AI & Machine Learning" required>
-          <p class="mt-1 text-sm text-gray-500">Enter a more specific type for your event.</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label for="category" class="block text-sm font-medium text-gray-700">Category</label>
+            <select class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
+                    id="category" name="category" required onchange="updateSubcategories()">
+              <option value="">Select a category</option>
+              <option value="Tech">Technology</option>
+              <option value="Business">Business</option>
+              <option value="Arts">Arts & Culture</option>
+              <option value="Community">Community</option>
+              <option value="Health">Health & Wellness</option>
+              <option value="Sports">Sports & Recreation</option>
+              <option value="Food">Food & Drink</option>
+              <option value="Education">Education</option>
+              <option value="Music">Music</option>
+            </select>
+          </div>
+          
+          <!-- Subcategory dropdown -->
+          <div>
+            <label for="subcategory" class="block text-sm font-medium text-gray-700">Subcategory</label>
+            <select class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
+                    id="subcategory" name="subcategory" required>
+              <option value="">Select a category first</option>
+            </select>
+          </div>
         </div>
         
         <div>
@@ -72,7 +70,6 @@
                   id="privacy" name="privacy" required>
             <option value="public">Public</option>
             <option value="private">Private</option>
-            <option value="invitation">Invitation Only</option>
           </select>
         </div>
         
@@ -95,4 +92,55 @@
     </form>
   </div>
 </div>
+
+<script>
+    // Define subcategories for each category
+    const subcategoriesMap = {
+        "Tech": ["Programming", "AI & Machine Learning", "Blockchain", "Startups", "Web Development", "Mobile Development", "Cloud Computing", "Data Science", "Cybersecurity"],
+        "Business": ["Networking", "Marketing", "Finance", "Entrepreneurship", "Leadership", "Management", "Sales", "Investment"],
+        "Arts": ["Visual Arts", "Theater", "Film", "Literature", "Photography", "Design", "Crafts", "Dance"],
+        "Community": ["Volunteering", "Environment", "Education", "Charity", "Activism", "Local Events", "Cultural"],
+        "Health": ["Fitness", "Yoga", "Mental Health", "Nutrition", "Meditation", "Wellness", "Healthcare"],
+        "Sports": ["Running", "Cycling", "Hiking", "Team Sports", "Water Sports", "Winter Sports", "Martial Arts", "Golf"],
+        "Food": ["Cooking", "Baking", "Wine Tasting", "Beer", "Dining", "Food Festivals", "Vegetarian/Vegan"],
+        "Education": ["Workshops", "Lectures", "Courses", "Conferences", "Research", "Languages", "Science"],
+        "Music": ["Live Music", "Concerts", "Festivals", "Classical", "Jazz", "Rock", "Electronic", "Hip Hop"]
+    };
+    
+    // Function to update subcategories dropdown
+    function updateSubcategories() {
+        const categorySelect = document.getElementById('category');
+        const subcategorySelect = document.getElementById('subcategory');
+        
+        // Clear existing options
+        subcategorySelect.innerHTML = '';
+        
+        const selectedCategory = categorySelect.value;
+        
+        if (selectedCategory && subcategoriesMap[selectedCategory]) {
+            // Add placeholder option
+            const placeholderOption = document.createElement('option');
+            placeholderOption.value = '';
+            placeholderOption.textContent = 'Select a subcategory';
+            subcategorySelect.appendChild(placeholderOption);
+            
+            // Add subcategory options
+            subcategoriesMap[selectedCategory].forEach(subcategory => {
+                const option = document.createElement('option');
+                option.value = subcategory;
+                option.textContent = subcategory;
+                subcategorySelect.appendChild(option);
+            });
+        } else {
+            // Add default option if no category selected
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'Select a category first';
+            subcategorySelect.appendChild(option);
+        }
+    }
+    
+    // Initialize subcategories on page load
+    document.addEventListener('DOMContentLoaded', updateSubcategories);
+</script>
 {% endblock %}
