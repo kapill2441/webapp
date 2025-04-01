@@ -1,15 +1,15 @@
-<!-- templates/edit_event.html -->
+<!-- templates/create_event.html -->
 {% extends "base.html" %}
 
 {% block content %}
 <div class="max-w-3xl mx-auto">
     <div class="bg-white shadow-md rounded-lg px-8 pt-6 pb-8 mb-4">
-        <h1 class="text-2xl font-bold text-gray-800 mb-6">Edit Event</h1>
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Create New Event</h1>
         
-        <form action="{{ url_for('edit_event', event_id=event.id) }}" method="post">
+        <form action="{{ url_for('create_event') }}" method="post">
             <div class="mb-4">
                 <label for="title" class="block text-gray-700 text-sm font-bold mb-2">Title</label>
-                <input type="text" id="title" name="title" value="{{ event.title }}" required 
+                <input type="text" id="title" name="title" required 
                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
             </div>
             
@@ -21,23 +21,22 @@
                             class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                             onchange="updateSubcategories()">
                         <option value="">Select a category</option>
-                        <option value="Music" {% if event.category == 'Music' %}selected{% endif %}>Music</option>
-                        <option value="Tech" {% if event.category == 'Tech' %}selected{% endif %}>Technology</option>
-                        <option value="Food" {% if event.category == 'Food' %}selected{% endif %}>Food & Drink</option>
-                        <option value="Arts" {% if event.category == 'Arts' %}selected{% endif %}>Arts & Culture</option>
-                        <option value="Sports" {% if event.category == 'Sports' %}selected{% endif %}>Sports & Fitness</option>
-                        <option value="Business" {% if event.category == 'Business' %}selected{% endif %}>Business</option>
-                        <option value="Health" {% if event.category == 'Health' %}selected{% endif %}>Health & Wellness</option>
-                        <option value="Community" {% if event.category == 'Community' %}selected{% endif %}>Community</option>
-                        <option value="Education" {% if event.category == 'Education' %}selected{% endif %}>Education</option>
+                        <option value="Music">Music</option>
+                        <option value="Tech">Technology</option>
+                        <option value="Food">Food & Drink</option>
+                        <option value="Arts">Arts & Culture</option>
+                        <option value="Sports">Sports & Fitness</option>
+                        <option value="Business">Business</option>
+                        <option value="Health">Health & Wellness</option>
+                        <option value="Community">Community</option>
+                        <option value="Education">Education</option>
                     </select>
                 </div>
                 
                 <div>
                     <label for="subcategory" class="block text-gray-700 text-sm font-bold mb-2">Subcategory</label>
                     <select id="subcategory" name="subcategory" required
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                            data-current-subcategory="{{ event.subcategory }}">
+                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
                         <option value="">Select a category first</option>
                     </select>
                 </div>
@@ -46,18 +45,18 @@
             <div class="mb-4">
                 <label for="description" class="block text-gray-700 text-sm font-bold mb-2">Description</label>
                 <textarea id="description" name="description" required rows="4"
-                          class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">{{ event.description }}</textarea>
+                          class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"></textarea>
             </div>
             
             <div class="mb-4">
                 <label for="location" class="block text-gray-700 text-sm font-bold mb-2">Location</label>
-                <input type="text" id="location" name="location" value="{{ event.location }}" required 
+                <input type="text" id="location" name="location" required 
                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
             </div>
             
             <div class="mb-4">
                 <label for="date" class="block text-gray-700 text-sm font-bold mb-2">Date</label>
-                <input type="date" id="date" name="date" value="{{ event.date.strftime('%Y-%m-%d') }}" required 
+                <input type="date" id="date" name="date" required 
                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
             </div>
             
@@ -65,14 +64,14 @@
                 <label for="privacy" class="block text-gray-700 text-sm font-bold mb-2">Privacy</label>
                 <select id="privacy" name="privacy" required
                         class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    <option value="public" {% if event.privacy == 'public' %}selected{% endif %}>Public</option>
-                    <option value="private" {% if event.privacy == 'private' %}selected{% endif %}>Private</option>
+                    <option value="public">Public</option>
+                    <option value="private">Private</option>
                 </select>
             </div>
             
             <div class="mb-6">
                 <label for="event_popularity" class="block text-gray-700 text-sm font-bold mb-2">Popularity (0-1)</label>
-                <input type="number" id="event_popularity" name="event_popularity" min="0" max="1" step="0.1" value="{{ event.event_popularity }}" required 
+                <input type="number" id="event_popularity" name="event_popularity" min="0" max="1" step="0.1" value="0.5" required 
                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
             </div>
             
@@ -80,40 +79,11 @@
                 <a href="{{ url_for('my_events') }}" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
                     Cancel
                 </a>
-                <button type="button" onclick="confirmDelete({{ event.id }}, '{{ event.title }}')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                    Delete
-                </button>
                 <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                    Update Event
+                    Create Event
                 </button>
             </div>
         </form>
-    </div>
-    
-    <!-- Delete Confirmation Modal -->
-    <div id="deleteModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg shadow-xl p-6 max-w-md mx-auto">
-            <div class="text-center">
-                <svg class="mx-auto h-12 w-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                </svg>
-                <h3 class="text-lg font-medium text-gray-900 mt-4">Confirm Deletion</h3>
-                <p class="text-sm text-gray-500 mt-2" id="deleteModalText">Are you sure you want to delete this event?</p>
-            </div>
-            <div class="mt-6 flex justify-center space-x-4">
-                <button type="button" onclick="hideDeleteModal()" 
-                        class="inline-flex justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    Cancel
-                </button>
-                <form id="deleteForm" method="POST" action="">
-                    <button type="submit" 
-                            class="inline-flex justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
-                        Delete
-                    </button>
-                </form>
-            </div>
-        </div>
     </div>
 </div>
 
@@ -136,7 +106,6 @@
         console.log("updateSubcategories called");  // Debug line
         const categorySelect = document.getElementById('category');
         const subcategorySelect = document.getElementById('subcategory');
-        const currentSubcategory = subcategorySelect.getAttribute('data-current-subcategory');
         
         // Clear existing options
         subcategorySelect.innerHTML = '';
@@ -156,16 +125,9 @@
                 const option = document.createElement('option');
                 option.value = subcategory;
                 option.textContent = subcategory;
-                
-                // Select the current subcategory if it matches
-                if (currentSubcategory === subcategory) {
-                    option.selected = true;
-                }
-                
                 subcategorySelect.appendChild(option);
             });
             console.log(`Added ${subcategoriesMap[selectedCategory].length} options`);  // Debug line
-            console.log("Current subcategory:", currentSubcategory);  // Debug line
         } else {
             // Add default option if no category selected
             const option = document.createElement('option');
@@ -174,32 +136,6 @@
             subcategorySelect.appendChild(option);
         }
     }
-    
-    // Show the delete confirmation modal
-    function confirmDelete(eventId, eventTitle) {
-        const modal = document.getElementById('deleteModal');
-        const modalText = document.getElementById('deleteModalText');
-        const deleteForm = document.getElementById('deleteForm');
-        
-        modalText.textContent = `Are you sure you want to delete "${eventTitle}"? This action cannot be undone.`;
-        deleteForm.action = `/delete_event/${eventId}`;
-        
-        modal.classList.remove('hidden');
-    }
-    
-    // Hide the delete confirmation modal
-    function hideDeleteModal() {
-        const modal = document.getElementById('deleteModal');
-        modal.classList.add('hidden');
-    }
-    
-    // Close modal when clicking outside of it
-    window.addEventListener('click', function(event) {
-        const modal = document.getElementById('deleteModal');
-        if (event.target === modal) {
-            hideDeleteModal();
-        }
-    });
     
     // Initialize subcategories on page load
     document.addEventListener('DOMContentLoaded', function() {
